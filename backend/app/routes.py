@@ -131,7 +131,8 @@ async def download_batch(req: BatchDownloadRequest) -> BatchResponse:
         except ProviderError as exc:
             items.append(BatchItem(url=url, error=exc.message))
             continue
-        items.append(BatchItem(url=url, jobId=jobs.start(url, req.format, provider)))
+        job_id = jobs.start(url, req.format, provider, req.titles.get(url))
+        items.append(BatchItem(url=url, jobId=job_id))
 
     accepted = sum(1 for i in items if i.jobId)
     skipped = sum(1 for i in items if i.skipped)

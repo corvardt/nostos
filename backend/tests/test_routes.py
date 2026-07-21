@@ -272,3 +272,17 @@ def test_clearing_history_empties_the_log(client, tmp_path):
     assert client.delete("/history").json()["cleared"] >= 1
     assert client.get("/history").json() == []
     assert kept.exists(), "the downloaded file must survive clearing history"
+
+
+def test_batch_carries_known_titles_onto_the_jobs(client, fake_provider):
+    """A playlist expansion knows every title, so queued rows should be named
+    before they start rather than showing a bare URL."""
+    fake_provider(FakeProvider())
+    url = "https://fake.test/titled"
+    body = client.post(
+        "/download/batch",
+        json={"urls": [url], "titles": {url: "A Known Title"}, "skip_duplicates": False},
+    ).json()
+
+    job = client.get(f"/jobs/{body['items'][0]['jobId']}").json()
+    assert job["title"] == "A Known Title"

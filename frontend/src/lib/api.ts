@@ -56,10 +56,14 @@ export const download = (url: string, format: string) =>
 export const expand = (url: string) =>
   request<Playlist>("/expand", { method: "POST", body: JSON.stringify({ url }) });
 
-export const downloadBatch = (urls: string[], format: string) =>
+export const downloadBatch = (
+  urls: string[],
+  format: string,
+  titles: Record<string, string> = {},
+) =>
   request<BatchResponse>("/download/batch", {
     method: "POST",
-    body: JSON.stringify({ urls, format }),
+    body: JSON.stringify({ urls, format, titles }),
   });
 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);

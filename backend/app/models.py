@@ -66,6 +66,10 @@ class BatchDownloadRequest(BaseModel):
     format: str | None = "best"
     # Re-running a playlist should not refetch what is already on disk.
     skip_duplicates: bool = True
+    # Titles already known, keyed by URL. A playlist expansion knows every one
+    # of them, so the queue can name its rows before any of them start, and a
+    # failure records a title rather than a bare URL.
+    titles: dict[str, str] = Field(default_factory=dict)
 
 
 class BatchItem(BaseModel):

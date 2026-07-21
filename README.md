@@ -99,6 +99,10 @@ compact rows. Completed items retire themselves a few seconds after finishing, s
 screen is exactly what still needs a decision: the failed and stopped ones, each with a Retry
 button. `Clear` empties the queue outright, stopping anything still running.
 
+Queue rows are named from the moment they are queued: a playlist expansion already knows every
+title, so it is sent along and nothing waits for a download to start before it can identify
+itself. It also means a failure records a title in history rather than a bare URL.
+
 Re-queueing a URL already downloaded is skipped when the file is still on disk, so re-running a
 playlist only fetches what is new. Analyze says so too, before you click.
 

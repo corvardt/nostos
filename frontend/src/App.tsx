@@ -17,9 +17,12 @@ const POLL_MS = 500;
 // stopped items are never auto-cleared: they are the ones you may want to retry.
 const DONE_LINGER_MS = 4000;
 
-/** A confirmed-before-queueing set of links: a paste of many, or a playlist. */
+/** A confirmed-before-queueing set of links: a paste of many, or a playlist.
+ *  Titles are known up front for playlists, so the queue can name its rows
+ *  before anything starts. */
 interface Pending {
   urls: string[];
+  titles: Record<string, string>;
   title?: string;
   truncated?: boolean;
 }
@@ -171,14 +174,14 @@ export default function App() {
     }
   }
 
-  async function runBatch(urls: string[], fmt: string) {
+  async function runBatch(urls: string[], fmt: string, titles: Record<string, string> = {}) {
     setError(null);
     setInfo(null);
     try {
-      const result = await api.downloadBatch(urls, fmt);
+      const result = await api.downloadBatch(urls, fmt, titles);
       const started = result.items
         .filter((i) => i.jobId)
-        .map((i) => blankJob(i.jobId!, i.url));
+        .map((i) => ({ ...blankJob(i.jobId!, i.url), title: titles[i.url] ?? null }));
       setJobs((prev) => [...started, ...prev]);
       setPending(null);
       setUrl("");
@@ -208,6 +211,9 @@ export default function App() {
       }
       setPending({
         urls: list.entries.map((e) => e.url),
+        titles: Object.fromEntries(
+          list.entries.filter((e) => e.title).map((e) => [e.url, e.title as string]),
+        ),
         title: list.title,
         truncated: list.truncated,
       });
@@ -222,7 +228,7 @@ export default function App() {
     e.preventDefault();
     const urls = extractUrls(url);
     if (urls.length > 1) {
-      setPending({ urls });
+      setPending({ urls, titles: {} });
       return;
     }
     const one = url.trim();
@@ -246,7 +252,7 @@ export default function App() {
       setUrl(text.trim());
       setInfo(null);
       setError(null);
-      setPending({ urls });
+      setPending({ urls, titles: {} });
       return;
     }
 
@@ -341,7 +347,7 @@ export default function App() {
               </button>
               <button
                 className="btn btn-primary"
-                onClick={() => runBatch(pending.urls, batchFormat)}
+                onClick={() => runBatch(pending.urls, batchFormat, pending.titles)}
               >
                 Download all
               </button>
