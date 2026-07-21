@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# Local data - never publish these. The database holds your download history,
+# and partial downloads may contain fragments of private media.
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.part
+*.ytdl
+
+# Secrets and machine-local config
+.env
+.env.*
+!.env.example
+cookies.txt
+*.netrc
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp

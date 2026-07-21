@@ -1,0 +1,750 @@
+/* Nostos - an instrument panel for moving a file from a URL onto this disk.
+ *
+ * Palette derived from the app icon (a white arrow on an azure squircle):
+ * the interface inverts it - azure on paper - and spends its only gradient
+ * on the transfer meter, the one moment the app exists for.
+ */
+
+:root {
+  --azure-bright: #2191ff; /* icon, top-left  */
+  --azure: #1470e1; /* icon, mid       */
+  --azure-deep: #054bb4; /* icon, shadow    */
+
+  --paper: #f7f8fa;
+  --panel: #ffffff;
+  --ink: #0a1628;
+  --slate: #5a6b85;
+  --rule: #dde3ec;
+  --sunken: #eef1f6;
+
+  --ok: #047857;
+  --warn: #b45309;
+  --bad: #be123c;
+
+  /* The icon is a squircle; the interface echoes its generous rounding. */
+  --r-lg: 16px;
+  --r-md: 11px;
+  --r-sm: 8px;
+
+  --sans: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #0b1220;
+    --panel: #121b2b;
+    --ink: #e8edf5;
+    --slate: #90a1bd;
+    --rule: #24314a;
+    --sunken: #0e1727;
+
+    --ok: #34d399;
+    --warn: #fbbf24;
+    --bad: #fb7185;
+
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+/* Scrolling stays, the scrollbar goes - nothing in this panel should compete
+ * with the transfer meter for attention. */
+html,
+body {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Every number in this interface is monospaced and tabular, so digits never
+ * jitter while a transfer is running. */
+.num {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+.app {
+  max-width: 660px;
+  margin: 0 auto;
+  padding: 32px 20px 96px;
+}
+
+/* ------------------------------------------------------------------ header */
+
+.masthead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 18px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  display: block;
+  flex-shrink: 0;
+}
+
+.wordmark {
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+/* The destination is the app's promise, so it stays visible at all times. */
+.destination {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  color: var(--slate);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.destination:hover {
+  background: var(--sunken);
+  color: var(--ink);
+}
+
+.destination-path {
+  font-family: var(--mono);
+  font-size: 12px;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  direction: rtl; /* keep the folder name visible when the path is long */
+  text-align: left;
+}
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--slate);
+}
+
+/* ------------------------------------------------------------------- input */
+
+.intake {
+  display: flex;
+  gap: 10px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.input::placeholder {
+  color: var(--slate);
+}
+
+.input:focus-visible {
+  border-color: var(--azure);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--azure) 18%, transparent);
+}
+
+.btn {
+  padding: 14px 20px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--rule);
+  background: var(--panel);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, background 0.15s, transform 0.06s;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--azure);
+  color: var(--azure);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--azure);
+  border-color: var(--azure);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--azure-deep);
+  border-color: var(--azure-deep);
+  color: #fff;
+}
+
+.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--azure);
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .link {
+    color: var(--azure-bright);
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--azure);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ panels */
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-lg);
+  padding: 18px;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* ----------------------------------------------------------------- preview */
+
+.preview {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.thumb {
+  width: 160px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  display: block;
+  background: var(--sunken);
+}
+
+.thumb-square {
+  aspect-ratio: 1;
+  width: 110px;
+}
+
+.duration {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(10, 22, 40, 0.82);
+  color: #fff;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.preview-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.preview-title {
+  margin: 8px 0 4px;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.005em;
+  /* Captions can be long; show a readable excerpt rather than a wall. */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.preview-author {
+  margin: 0;
+  color: var(--slate);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+
+/* Platform is stated as a label, not a colored pill - the three platforms
+ * differ in what they require of you, and that is what the row records. */
+.source {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.source-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--azure);
+}
+
+/* --------------------------------------------------------- format ladder */
+
+.ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.rung {
+  padding: 7px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-sm);
+  background: var(--panel);
+  color: var(--slate);
+  font-family: var(--mono);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.rung:hover:not(:disabled) {
+  border-color: var(--azure);
+  color: var(--ink);
+}
+
+.rung[aria-pressed="true"] {
+  border-color: var(--azure);
+  background: color-mix(in srgb, var(--azure) 10%, transparent);
+  color: var(--azure);
+  font-weight: 500;
+}
+
+.rung:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.rung-size {
+  display: block;
+  font-size: 10px;
+  color: var(--slate);
+  font-weight: 400;
+}
+
+.dispatch {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+/* --------------------------------------------------- transfer readout */
+/* The signature element: the moment a file crosses onto this disk, reported
+ * like a measuring instrument rather than a decorative bar. */
+
+.transfer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 12px;
+}
+
+.transfer-pct {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.track {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--sunken);
+  overflow: hidden;
+}
+
+.track-fill {
+  height: 100%;
+  border-radius: 999px;
+  /* The icon's own gradient - the app's one chromatic flourish. */
+  background: linear-gradient(90deg, var(--azure-bright), var(--azure-deep));
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate);
+}
+
+.transfer-idle .track-fill {
+  /* Queued: no measurement yet, so the track breathes instead of lying. */
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ------------------------------------------------------------- outcomes */
+
+.outcome {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.outcome-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.outcome-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.panel-ok .outcome-label {
+  color: var(--ok);
+}
+
+.panel-bad .outcome-label {
+  color: var(--bad);
+}
+
+.panel-ok {
+  border-color: color-mix(in srgb, var(--ok) 40%, var(--rule));
+}
+
+.panel-bad {
+  border-color: color-mix(in srgb, var(--bad) 40%, var(--rule));
+}
+
+.filepath {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--slate);
+  word-break: break-all;
+  margin: 6px 0 0;
+}
+
+.outcome-msg {
+  margin: 6px 0 0;
+  font-size: 14px;
+}
+
+/* -------------------------------------------------------------- history */
+
+.ledger {
+  margin-top: 40px;
+}
+
+.ledger-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.row-done {
+  background: var(--ok);
+}
+
+.row-error {
+  background: var(--bad);
+}
+
+.row-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: inherit;
+  text-decoration: none;
+}
+
+.row-title:hover {
+  color: var(--azure);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .row-title:hover {
+    color: var(--azure-bright);
+  }
+}
+
+.row-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate);
+  flex-shrink: 0;
+}
+
+.empty {
+  padding: 28px 4px;
+  color: var(--slate);
+  font-size: 14px;
+}
+
+/* --------------------------------------------------------------- footer */
+
+.footer {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 44px;
+  padding-top: 14px;
+  border-top: 1px solid var(--rule);
+}
+
+.footer-link {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--slate);
+  text-decoration: none;
+}
+
+.footer-link::before {
+  content: "@";
+  opacity: 0.55;
+}
+
+.footer-link:hover {
+  color: var(--azure);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+@media (prefers-color-scheme: dark) {
+  .footer-link:hover {
+    color: var(--azure-bright);
+  }
+}
+
+/* ------------------------------------------------------------- settings */
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.field-help {
+  font-size: 12px;
+  color: var(--slate);
+  margin: 0;
+}
+
+.select {
+  padding: 11px 13px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-md);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  outline: none;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+}
+
+.toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--azure);
+  cursor: pointer;
+  margin: 0;
+}
+
+.settings-foot {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.mono-input {
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+/* ---------------------------------------------------------------- motion */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------------------------------------------------------------- mobile */
+
+@media (max-width: 560px) {
+  .app {
+    padding: 24px 16px 64px;
+  }
+
+  .intake {
+    flex-direction: column;
+  }
+
+  .preview {
+    flex-direction: column;
+  }
+
+  .thumb {
+    width: 100%;
+  }
+
+  .thumb-square {
+    width: 100%;
+  }
+
+  .destination-path {
+    max-width: 120px;
+  }
+
+  .dispatch {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .readout {
+    flex-direction: column;
+    gap: 4px;
+  }
+}

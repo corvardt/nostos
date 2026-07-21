@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+yt-dlp
+pydantic>=2
+pytest
+
+# Required on Linux to decrypt Chromium-family cookie stores (Chrome, Brave,
+# Chromium, Edge, Opera, Vivaldi) via the OS keyring. Firefox does not need it.
+secretstorage; sys_platform == "linux"
