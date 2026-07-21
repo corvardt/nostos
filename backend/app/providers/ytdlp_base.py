@@ -6,7 +6,9 @@ overrides - all of the resolve/download mechanics live here once.
 
 from __future__ import annotations
 
+import contextlib
 import re
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +18,7 @@ from yt_dlp.utils import DownloadError, ExtractorError, match_filter_func
 from .. import config
 from ..models import Format, MediaInfo
 from .base import Provider, ProviderError, ProgressCallback
+from .cookies import CookieError, domains_for, scoped_cookie_file
 
 IMAGE_EXTS = {"jpg", "jpeg", "png", "webp", "heic", "gif"}
 
@@ -52,6 +55,9 @@ class YtDlpProvider(Provider):
 
     url_pattern: re.Pattern[str]
     use_cookies: bool = False
+    # Cookies are narrowed to these domains. Empty means "derive from the URL",
+    # which is what the generic provider needs.
+    cookie_domains: tuple[str, ...] = ()
 
     def supports(self, url: str) -> bool:
         return bool(self.url_pattern.search(url.strip()))
@@ -69,11 +75,32 @@ class YtDlpProvider(Provider):
             # so without this `_speed_str` arrives wrapped in ANSI escape codes.
             "color": "no_color",
         }
-        if self.use_cookies:
-            browser = config.cookies_from_browser()
-            if browser:
-                opts["cookiesfrombrowser"] = (browser,)
         return opts
+
+    @contextlib.contextmanager
+    def _session(self, url: str, extra: dict[str, Any] | None = None) -> Iterator[dict[str, Any]]:
+        """yt-dlp options with a cookie file scoped to this request, if needed.
+
+        The file is created for the call and deleted straight after, so the only
+        cookies on disk at any moment are the ones this one request required.
+        """
+        opts = self.base_opts()
+        if extra:
+            opts.update(extra)
+
+        if not self.use_cookies:
+            yield opts
+            return
+
+        browser = config.cookies_from_browser()
+        domains = self.cookie_domains or domains_for(url)
+        try:
+            with scoped_cookie_file(browser, domains) as jar:
+                if jar:
+                    opts["cookiefile"] = str(jar)
+                yield opts
+        except CookieError as exc:
+            raise ProviderError(str(exc), needs_auth=True) from exc
 
     @staticmethod
     def _postprocessors() -> list[dict[str, Any]]:
@@ -110,15 +137,14 @@ class YtDlpProvider(Provider):
         `extract_flat` returns ids, titles and URLs from the index pages alone,
         which is why a long playlist expands in about a second.
         """
-        opts = self.base_opts()
-        opts.update({
+        extra = {
             "noplaylist": False,
             "extract_flat": "in_playlist",
             "playlistend": limit + 1,  # one extra, to detect truncation
-        })
+        }
 
         try:
-            with YoutubeDL(opts) as ydl:
+            with self._session(url, extra) as opts, YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
         except (DownloadError, ExtractorError) as exc:
             raise self._translate(exc) from exc
@@ -134,7 +160,7 @@ class YtDlpProvider(Provider):
 
     def resolve(self, url: str) -> MediaInfo:
         try:
-            with YoutubeDL(self.base_opts()) as ydl:
+            with self._session(url) as opts, YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=False)
         except (DownloadError, ExtractorError) as exc:
             raise self._translate(exc) from exc
@@ -235,8 +261,7 @@ class YtDlpProvider(Provider):
         dest = config.download_dir()
         dest.mkdir(parents=True, exist_ok=True)
 
-        opts = self.base_opts()
-        opts.update(
+        extra: dict[str, Any] = (
             {
                 "outtmpl": str(dest / "%(uploader,channel,extractor)s - %(title).100B [%(id)s].%(ext)s"),
                 "restrictfilenames": True,
@@ -251,16 +276,16 @@ class YtDlpProvider(Provider):
                 "postprocessors": self._postprocessors(),
             }
         )
-        opts.update(self._subtitle_opts())
+        extra.update(self._subtitle_opts())
         # "best" needs an explicit selector so ffmpeg muxes video+audio together.
-        opts["format"] = "bv*+ba/b" if fmt in (None, "", "best") else fmt
+        extra["format"] = "bv*+ba/b" if fmt in (None, "", "best") else fmt
         # A failed thumbnail or subtitle embed must not sink the download itself.
-        opts["ignoreerrors"] = "only_download"
+        extra["ignoreerrors"] = "only_download"
         if on_progress:
-            opts["progress_hooks"] = [on_progress]
+            extra["progress_hooks"] = [on_progress]
 
         try:
-            with YoutubeDL(opts) as ydl:
+            with self._session(url, extra) as opts, YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
         except (DownloadError, ExtractorError) as exc:
             raise self._translate(exc) from exc

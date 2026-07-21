@@ -37,10 +37,15 @@ bind it to `0.0.0.0`, do not port-forward it, and do not put it on a public host
 on another device, put it behind a tunnel with access control (for example Cloudflare Tunnel plus
 Cloudflare Access) rather than exposing the port.
 
-**It reuses your browser's cookies.** To reach Instagram and Threads, Nostos reads the session
-cookies of a browser you select in Settings. Those cookies stay on your machine and are never
-written to disk by Nostos or sent anywhere except the platform they belong to, but they do grant
-access to your logged-in accounts, so only run this on a machine you trust.
+**It reuses your browser's cookies, narrowly.** To reach Instagram and Threads, Nostos reads the
+session cookies of a browser you select in Settings. It does not hand your browser profile to
+yt-dlp: the jar is filtered to the domains being contacted, so an Instagram download carries
+Instagram cookies and nothing else. Roughly 1% of a real profile reaches any single request.
+
+The scoped cookies are written to a private file (mode `0600`, unpredictable name, under
+`~/.local/share/nostos/cookies`) that exists only for the duration of that one call and is
+deleted afterwards, including when the download fails. Cookie values are never logged. They still
+grant access to your logged-in accounts, so only run this on a machine you trust.
 
 **Download only what you have the right to.** This tool is for retrieving your own uploads or
 content you are permitted to save. Respect each platform's terms of service and local copyright

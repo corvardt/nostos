@@ -19,3 +19,4 @@ class InstagramProvider(YtDlpProvider):
         re.IGNORECASE,
     )
     use_cookies = True
+    cookie_domains = ("instagram.com",)

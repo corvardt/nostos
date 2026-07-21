@@ -17,26 +17,18 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from yt_dlp.cookies import extract_cookies_from_browser
-
 from .. import config
 from ..models import Format, MediaInfo
 from .base import Provider, ProviderError, ProgressCallback
+from .cookies import CookieError, _QuietLogger, select
 from .threads_scrape import USER_AGENT, extract_media, fetch_post_html
+
+THREADS_DOMAINS = ("threads.com", "threads.net")
 
 _URL_RE = re.compile(
     r"^(https?://)?(www\.)?threads\.(net|com)/(@[\w.]+/post/|t/)([\w-]+)",
     re.IGNORECASE,
 )
-
-
-class _QuietLogger:
-    """yt-dlp's cookie loader expects a logger; we do not want its chatter."""
-
-    def debug(self, msg: str) -> None: ...
-    def info(self, msg: str) -> None: ...
-    def warning(self, msg: str, **kwargs) -> None: ...
-    def error(self, msg: str) -> None: ...
 
 
 class ThreadsProvider(Provider):
@@ -55,12 +47,16 @@ class ThreadsProvider(Provider):
                 "you are signed in to Threads with under Settings.",
                 needs_auth=True,
             )
+        from yt_dlp.cookies import extract_cookies_from_browser
+
         try:
             jar = extract_cookies_from_browser(browser, logger=_QuietLogger())
         except Exception as exc:  # noqa: BLE001 - keyring/browser failures vary widely
             raise ProviderError(f"Could not read cookies from {browser}: {exc}", needs_auth=True) from exc
 
-        cookies = {c.name: c.value for c in jar if "threads" in (c.domain or "")}
+        # Only Threads' own cookies leave this function; the rest of the profile
+        # is dropped here rather than being carried into the request.
+        cookies = {c.name: c.value for c in select(jar, THREADS_DOMAINS)}
         if "sessionid" not in cookies:
             raise ProviderError(
                 f"No Threads login found in {browser}. Open threads.com in {browser}, "
