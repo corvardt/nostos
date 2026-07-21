@@ -209,9 +209,11 @@ def _run(job_id: str, url: str, fmt: str | None, provider: Provider) -> None:
             _discard_partials(touched)
             _update(job_id, status="cancelled", speed=None, eta=None)
             return
+        _discard_partials(touched)
         _fail(job_id, url, provider.name, exc.message)
     except Exception as exc:  # noqa: BLE001 - a worker thread must never die silently
         log.exception("download failed for %s", url)
+        _discard_partials(touched)
         _fail(job_id, url, provider.name, f"Unexpected error: {exc}")
     else:
         # Extraction runs before the first progress hook, so a job cancelled in

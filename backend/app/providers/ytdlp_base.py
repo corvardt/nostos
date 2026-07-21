@@ -279,29 +279,65 @@ class YtDlpProvider(Provider):
         extra.update(self._subtitle_opts())
         # "best" needs an explicit selector so ffmpeg muxes video+audio together.
         extra["format"] = "bv*+ba/b" if fmt in (None, "", "best") else fmt
-        # A failed thumbnail or subtitle embed must not sink the download itself.
-        extra["ignoreerrors"] = "only_download"
         if on_progress:
             extra["progress_hooks"] = [on_progress]
 
+        video_id = None
         try:
             with self._session(url, extra) as opts, YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(url, download=True)
         except (DownloadError, ExtractorError) as exc:
+            # The media may be on disk already, with only a postprocessor having
+            # failed (embedding artwork, muxing subtitles). Losing a good file
+            # over its cover art would be worse than shipping it untagged.
+            salvaged = self._find_by_id(dest, self._id_from(url))
+            if salvaged:
+                return salvaged
             raise self._translate(exc) from exc
 
         # match_filter skips the item but still returns its info dict, so the
-        # live case is detected here rather than by a None return.
-        if info is None or self._is_live(info):
+        # live case shows up as a returned dict, not as a None.
+        if info is not None and self._is_live(info):
             raise ProviderError(
                 "This is a live broadcast. Nostos does not download live streams; "
                 "try again once the stream has ended and been published."
             )
+        if info is None:
+            raise ProviderError("yt-dlp reported no result for this URL.")
 
-        path = self._final_path(info)
+        video_id = info.get("id")
+        path = self._final_path(info) or self._find_by_id(dest, video_id)
         if not path:
-            raise ProviderError("Download finished but the output file could not be located.")
+            raise ProviderError(
+                "The download reported success but produced no file. This usually means "
+                "the chosen quality was unavailable; try a different one."
+            )
         return path
+
+    @staticmethod
+    def _id_from(url: str) -> str | None:
+        match = re.search(r"[?&]v=([\w-]{6,})|/([\w-]{6,})/?$", url)
+        return next((g for g in (match.groups() if match else ()) if g), None)
+
+    @staticmethod
+    def _find_by_id(dest: Path, video_id: str | None) -> str | None:
+        """Locate the output by id when the recorded path has gone stale.
+
+        Postprocessors rename and change containers, so the path yt-dlp reported
+        mid-download is not always the one that ends up on disk. The id is in
+        every filename by way of the output template.
+        """
+        if not video_id or not dest.is_dir():
+            return None
+        skip = IMAGE_EXTS | {"part", "ytdl", "temp"}
+        found = [
+            p
+            for p in dest.glob(f"*[[]{video_id}[]]*")
+            if p.is_file() and p.suffix.lstrip(".").lower() not in skip
+        ]
+        if not found:
+            return None
+        return str(max(found, key=lambda p: p.stat().st_mtime))
 
     @staticmethod
     def _final_path(info: dict[str, Any] | None) -> str | None:

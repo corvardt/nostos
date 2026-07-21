@@ -169,3 +169,37 @@ def test_unknown_codecs_are_not_treated_as_an_image() -> None:
 def test_image_formats_are_still_detected() -> None:
     info = {"ext": "jpg", "formats": [{"ext": "jpg"}, {"ext": "webp"}]}
     assert YtDlpProvider._is_image(info) is True
+
+
+# ------------------------------------------------- locating the output file
+
+
+def test_finds_the_output_by_id_when_the_path_went_stale(tmp_path) -> None:
+    """Postprocessors rename and change container, so the path reported during
+    the download is not always the one left on disk."""
+    (tmp_path / "Chan - A Video [dQw4w9WgXcQ].mkv").write_text("media")
+    found = YtDlpProvider._find_by_id(tmp_path, "dQw4w9WgXcQ")
+    assert found is not None and found.endswith(".mkv")
+
+
+def test_the_leftover_thumbnail_is_not_mistaken_for_the_output(tmp_path) -> None:
+    """The reported bug: only the .webp was present, so it must not be returned
+    as though it were the download."""
+    (tmp_path / "Chan - A Video [dQw4w9WgXcQ].webp").write_text("cover art")
+    (tmp_path / "Chan - A Video [dQw4w9WgXcQ].mp4.part").write_text("partial")
+    assert YtDlpProvider._find_by_id(tmp_path, "dQw4w9WgXcQ") is None
+
+
+def test_another_videos_file_is_not_returned(tmp_path) -> None:
+    (tmp_path / "Chan - Other [xxxxxxxxxxx].mp4").write_text("someone else")
+    assert YtDlpProvider._find_by_id(tmp_path, "dQw4w9WgXcQ") is None
+
+
+def test_find_by_id_tolerates_a_missing_directory(tmp_path) -> None:
+    assert YtDlpProvider._find_by_id(tmp_path / "nope", "abc") is None
+    assert YtDlpProvider._find_by_id(tmp_path, None) is None
+
+
+def test_video_id_parsed_from_common_url_shapes() -> None:
+    assert YtDlpProvider._id_from("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == "dQw4w9WgXcQ"
+    assert YtDlpProvider._id_from("https://youtu.be/dQw4w9WgXcQ") == "dQw4w9WgXcQ"
