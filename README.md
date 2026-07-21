@@ -186,9 +186,15 @@ Completed and failed jobs are written to SQLite (`db.py`).
 ## Development
 
 ```bash
-cd backend && .venv/bin/pytest      # providers, parsing, sanitising (no network)
-cd frontend && npm run build        # typecheck + bundle
+cd backend
+.venv/bin/pip install -r requirements-dev.txt   # test tooling, once
+.venv/bin/pytest                                # 94 tests, no network
+
+cd ../frontend && npm run build                 # typecheck + bundle
 ```
+
+Nothing in the suite touches a real site: providers are faked and page payloads come from
+fixtures, so the tests are fast and work offline.
 
 The frontend is plain React + TypeScript + Vite, which is exactly what a Tauri desktop shell
 would wrap. All backend calls live in `frontend/src/lib/api.ts`, and no component calls `fetch`
