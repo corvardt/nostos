@@ -6,7 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-JobStatus = Literal["queued", "running", "done", "error"]
+JobStatus = Literal["queued", "running", "done", "error", "cancelled"]
 
 
 class Format(BaseModel):
@@ -108,5 +108,7 @@ class Settings(BaseModel):
     cookies_from_browser: str = ""
     # Pasting a link analyzes and downloads it at best quality, with no clicks.
     auto_download: bool = False
+    # Comma-separated language codes, e.g. "en,fr". Empty disables subtitles.
+    subtitle_langs: str = ""
     # Reported so the UI can show where history lives; ignored on write.
     db_path: str = ""

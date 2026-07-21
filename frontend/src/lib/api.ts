@@ -64,6 +64,12 @@ export const downloadBatch = (urls: string[], format: string) =>
 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);
 
+export const cancelJob = (id: string) =>
+  request<{ cancelled: boolean }>(`/jobs/${id}`, { method: "DELETE" });
+
+export const cancelAll = () =>
+  request<{ cancelled: number }>("/jobs", { method: "DELETE" });
+
 export const getHistory = () => request<HistoryEntry[]>("/history");
 
 export const getSettings = () => request<Settings>("/settings");

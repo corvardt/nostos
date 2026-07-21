@@ -74,6 +74,21 @@ export default function SettingsPanel({ settings, onSaved }: Props) {
         </p>
       </div>
 
+      <label className="field">
+        <span className="field-label">Subtitle languages</span>
+        <input
+          className="input mono-input"
+          value={draft.subtitle_langs}
+          placeholder="en, fr"
+          spellCheck={false}
+          onChange={(e) => setDraft({ ...draft, subtitle_langs: e.target.value })}
+        />
+        <p className="field-help">
+          Comma-separated language codes, embedded into the file. Leave empty for no subtitles.
+          Titles, cover art and chapters are always embedded.
+        </p>
+      </label>
+
       {settings.db_path && (
         <div className="field">
           <span className="field-label">History database</span>

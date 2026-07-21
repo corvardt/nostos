@@ -3,16 +3,22 @@
 from __future__ import annotations
 
 from .base import Provider, ProviderError
+from .generic import GenericProvider
 from .instagram import InstagramProvider
 from .threads import ThreadsProvider
 from .youtube import YouTubeProvider
 
-# Order matters only if two patterns overlap; today they are disjoint.
+# Order matters: the dedicated providers claim their URLs first, and the
+# generic yt-dlp fallback sweeps up whatever is left.
 PROVIDERS: list[Provider] = [
     YouTubeProvider(),
     InstagramProvider(),
     ThreadsProvider(),
+    GenericProvider(),
 ]
+
+# The ones with platform-specific handling, named in errors and docs.
+NAMED = [p.name for p in PROVIDERS if p.name != "generic"]
 
 
 def resolve_provider(url: str) -> Provider:
@@ -22,5 +28,6 @@ def resolve_provider(url: str) -> Provider:
     for provider in PROVIDERS:
         if provider.supports(url):
             return provider
-    supported = ", ".join(p.name for p in PROVIDERS)
-    raise ProviderError(f"No provider matched this URL. Supported platforms: {supported}.")
+    raise ProviderError(
+        "That does not look like a link. Paste a full URL starting with http:// or https://."
+    )

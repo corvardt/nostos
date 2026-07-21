@@ -127,6 +127,19 @@ async def get_job(job_id: str) -> Job:
     return job
 
 
+@router.delete("/jobs/{job_id}")
+async def cancel_job(job_id: str) -> dict[str, bool]:
+    if jobs.get(job_id) is None:
+        raise HTTPException(status_code=404, detail="Unknown job id.")
+    return {"cancelled": jobs.cancel(job_id)}
+
+
+@router.delete("/jobs")
+async def cancel_all_jobs() -> dict[str, int]:
+    """Stop everything still queued or running, for a batch started by mistake."""
+    return {"cancelled": jobs.cancel_all()}
+
+
 @router.get("/history", response_model=list[HistoryEntry])
 async def history(limit: int = 50) -> list[HistoryEntry]:
     return [HistoryEntry(**row) for row in db.list_history(limit)]
@@ -138,6 +151,7 @@ async def get_settings() -> Settings:
         download_dir=db.get_setting(config.KEY_DOWNLOAD_DIR),
         cookies_from_browser=db.get_setting(config.KEY_COOKIES_FROM_BROWSER),
         auto_download=db.get_setting(config.KEY_AUTO_DOWNLOAD) == "1",
+        subtitle_langs=db.get_setting(config.KEY_SUBTITLE_LANGS),
         db_path=str(config.DB_PATH),
     )
 
@@ -152,6 +166,7 @@ async def put_settings(settings: Settings) -> Settings:
     db.set_setting(config.KEY_DOWNLOAD_DIR, settings.download_dir)
     db.set_setting(config.KEY_COOKIES_FROM_BROWSER, settings.cookies_from_browser)
     db.set_setting(config.KEY_AUTO_DOWNLOAD, "1" if settings.auto_download else "0")
+    db.set_setting(config.KEY_SUBTITLE_LANGS, settings.subtitle_langs.strip())
     config.ensure_dirs()
     return await get_settings()
 

@@ -64,6 +64,33 @@ class YtDlpProvider(Provider):
                 opts["cookiesfrombrowser"] = (browser,)
         return opts
 
+    @staticmethod
+    def _postprocessors() -> list[dict[str, Any]]:
+        """Embed tags, chapters and cover art, and subtitles when asked for.
+
+        `EmbedThumbnail` is told to carry on if the container rejects the image:
+        losing cover art is not a reason to fail an otherwise good download.
+        """
+        chain: list[dict[str, Any]] = [
+            {"key": "FFmpegMetadata", "add_metadata": True, "add_chapters": True},
+            {"key": "EmbedThumbnail", "already_have_thumbnail": False},
+        ]
+        if config.subtitle_langs():
+            chain.insert(0, {"key": "FFmpegEmbedSubtitle", "already_have_subtitle": False})
+        return chain
+
+    def _subtitle_opts(self) -> dict[str, Any]:
+        langs = config.subtitle_langs()
+        if not langs:
+            return {}
+        return {
+            "writesubtitles": True,
+            "subtitleslangs": langs,
+            # Auto-generated captions only when the uploader provided none.
+            "writeautomaticsub": True,
+            "subtitlesformat": "best",
+        }
+
     # --------------------------------------------------------------- playlist
 
     def expand_playlist(self, url: str, limit: int) -> tuple[str, list[dict[str, Any]], bool]:
@@ -143,12 +170,10 @@ class YtDlpProvider(Provider):
         formats = info.get("formats") or []
         if not formats:
             return (info.get("ext") or "").lower() in IMAGE_EXTS
-        # No format carries a real video or audio codec -> it is a still image.
-        return all(
-            (f.get("vcodec") in (None, "none") and f.get("acodec") in (None, "none"))
-            or (f.get("ext") or "").lower() in IMAGE_EXTS
-            for f in formats
-        )
+        # Judge by container, not codecs: many extractors leave vcodec/acodec
+        # unset, and "not reported" is not the same as "not present". Treating
+        # unknown as absent made direct video links look like stills.
+        return all((f.get("ext") or "").lower() in IMAGE_EXTS for f in formats)
 
     @staticmethod
     def _simplify_formats(info: dict[str, Any]) -> list[Format]:
@@ -209,10 +234,17 @@ class YtDlpProvider(Provider):
                 # A live broadcast downloads in real time and never completes,
                 # holding a worker forever. Refuse it rather than hang.
                 "match_filter": match_filter_func("!is_live"),
+                # Keep the cover art and tags in the file, so a download is a
+                # library item rather than an anonymous blob.
+                "writethumbnail": True,
+                "postprocessors": self._postprocessors(),
             }
         )
+        opts.update(self._subtitle_opts())
         # "best" needs an explicit selector so ffmpeg muxes video+audio together.
         opts["format"] = "bv*+ba/b" if fmt in (None, "", "best") else fmt
+        # A failed thumbnail or subtitle embed must not sink the download itself.
+        opts["ignoreerrors"] = "only_download"
         if on_progress:
             opts["progress_hooks"] = [on_progress]
 

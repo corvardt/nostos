@@ -7,7 +7,9 @@ original file. Everything runs on your own machine: no account, no server, no ex
 
 ## Features
 
-- **Three platforms.** YouTube videos and Shorts, Instagram posts and Reels, Threads posts.
+- **Over 1700 sites.** YouTube, Instagram and Threads have dedicated handling; everything else
+  yt-dlp supports (TikTok, X, Reddit, Vimeo, SoundCloud, Twitch and the rest) is picked up by a
+  generic fallback.
 - **Preview before you commit.** Title, author, thumbnail, duration and the qualities on offer.
 - **Batch downloads.** Paste any number of links at once and queue them together.
 - **Playlist expansion.** Paste a playlist and it lists its items, up to 200, in a couple of
@@ -15,6 +17,9 @@ original file. Everything runs on your own machine: no account, no server, no ex
 - **One quality for a whole queue**, chosen as a cap so mixed items each get their best.
 - **Paste to download**, optional: one paste analyzes and fetches at top quality, no clicks.
 - **Live transfer readout** with progress, speed, bytes moved and time remaining.
+- **Stop anything mid-flight**, one item or the whole queue, and the partial files are cleaned up.
+- **Tagged files.** Title, artist, date, source URL, chapters and cover art are embedded into
+  every download. Subtitles too, if you name the languages.
 - **History** of everything downloaded, kept in a local SQLite database.
 - **Polite by default.** Downloads are paced per platform, and live broadcasts are refused
   rather than left running forever.
@@ -89,6 +94,10 @@ only the status.
 Downloads are paced per platform: YouTube runs three at a time, Instagram and Threads one at a
 time with a short gap, because they throttle bursts.
 
+Anything still queued or running can be stopped, individually or all at once. A cancelled
+download takes its scratch files with it (`.part`, fragments, orphaned cover art), since there is
+no resume to use them for.
+
 **Live broadcasts are refused.** They download in real time and never finish, so a single live
 item in a playlist would hold a worker open indefinitely. Analyze flags them before you click.
 
@@ -103,6 +112,10 @@ decrypt Chromium-family cookie stores via the OS keyring. Firefox does not need 
 | YouTube | yt-dlp | no |
 | Instagram | yt-dlp | usually not for public Reels |
 | Threads | dedicated scraper | **yes, always** |
+| Everything else | yt-dlp generic fallback | depends on the site |
+
+Anything the three dedicated providers do not claim goes to the fallback, which hands it to
+yt-dlp's full extractor set. Cookies are offered there too, so gated sites work the same way.
 
 **Threads has no yt-dlp extractor.** Every Threads URL falls through to yt-dlp's `generic`
 extractor, which finds nothing, so `providers/threads.py` implements the Provider contract
@@ -149,7 +162,9 @@ Completed and failed jobs are written to SQLite (`db.py`).
 | POST | `/download` | `{url, format}` → `{status, jobId}` |
 | GET | `/jobs/{id}` | progress and final path |
 | GET | `/history` | recent downloads |
-| GET/PUT | `/settings` | download folder, browser, paste behaviour |
+| DELETE | `/jobs/{id}` | stop one download |
+| DELETE | `/jobs` | stop everything queued or running |
+| GET/PUT | `/settings` | download folder, browser, paste behaviour, subtitles |
 
 ## Development
 

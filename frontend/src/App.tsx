@@ -68,7 +68,7 @@ export default function App() {
   // Poll every unfinished job on one timer. Keyed on the active ids so the
   // interval is rebuilt when the set changes, not on every progress tick.
   const activeIds = useMemo(
-    () => jobs.filter((j) => j.status !== "done" && j.status !== "error").map((j) => j.id),
+    () => jobs.filter((j) => j.status !== "done" && j.status !== "error" && j.status !== "cancelled").map((j) => j.id),
     [jobs],
   );
   const activeKey = activeIds.join(",");
@@ -83,7 +83,7 @@ export default function App() {
       if (fresh.length === 0) return;
 
       setJobs((prev) => prev.map((j) => fresh.find((f) => f.id === j.id) ?? j));
-      if (fresh.some((j) => j.status === "done" || j.status === "error")) refreshHistory();
+      if (fresh.some((j) => j.status === "done" || j.status === "error" || j.status === "cancelled")) refreshHistory();
     }, POLL_MS);
 
     return () => window.clearInterval(timer);
@@ -94,7 +94,7 @@ export default function App() {
   // only here, since history records the status but not the reason.
   useEffect(() => {
     if (jobs.length === 0) return;
-    const settled = jobs.every((j) => j.status === "done" || j.status === "error");
+    const settled = jobs.every((j) => j.status === "done" || j.status === "error" || j.status === "cancelled");
     if (!settled || jobs.some((j) => j.status === "error")) return;
 
     const fade = window.setTimeout(() => setFading(true), CLEAR_MS - FADE_MS);
@@ -107,6 +107,21 @@ export default function App() {
       window.clearTimeout(clear);
     };
   }, [jobs]);
+
+  async function onCancel(id: string) {
+    // Reflect it at once; the poll confirms once the worker unwinds.
+    setJobs((prev) => prev.map((j) => (j.id === id ? { ...j, status: "cancelled" } : j)));
+    await api.cancelJob(id).catch(() => {});
+  }
+
+  async function onCancelAll() {
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.status === "queued" || j.status === "running" ? { ...j, status: "cancelled" } : j,
+      ),
+    );
+    await api.cancelAll().catch(() => {});
+  }
 
   function reportError(err: unknown) {
     const needsAuth = err instanceof api.ApiError && err.needsAuth;
@@ -240,7 +255,7 @@ export default function App() {
     }
   }
 
-  const busy = jobs.some((j) => j.status !== "done" && j.status !== "error");
+  const busy = jobs.some((j) => j.status !== "done" && j.status !== "error" && j.status !== "cancelled");
   const singleJob = jobs.length === 1 ? jobs[0] : null;
 
   return (
@@ -354,7 +369,11 @@ export default function App() {
         {/* One download keeps the full instrument readout; a queue gets rows. */}
         {jobs.length > 0 && (
           <div className={fading ? "settling" : undefined}>
-            {singleJob ? <JobProgress job={singleJob} /> : <QueueList jobs={jobs} />}
+            {singleJob ? (
+              <JobProgress job={singleJob} onCancel={onCancel} />
+            ) : (
+              <QueueList jobs={jobs} onCancel={onCancel} onCancelAll={onCancelAll} />
+            )}
           </div>
         )}
       </div>

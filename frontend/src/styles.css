@@ -906,3 +906,28 @@ body {
     transition: none;
   }
 }
+
+.queue-head-right {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.queue-stop {
+  background: none;
+  border: none;
+  color: var(--slate);
+  font-size: 17px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.queue-stop:hover {
+  color: var(--bad);
+}
+
+.queue-dot-cancelled {
+  background: var(--slate);
+}

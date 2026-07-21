@@ -1,6 +1,6 @@
 // Mirrors backend/app/models.py - keep the two in sync.
 
-export type JobStatus = "queued" | "running" | "done" | "error";
+export type JobStatus = "queued" | "running" | "done" | "error" | "cancelled";
 
 export interface Format {
   id: string;
@@ -78,6 +78,8 @@ export interface Settings {
   cookies_from_browser: string;
   /** Pasting a link analyzes and downloads it at best quality, with no clicks. */
   auto_download: boolean;
+  /** Comma-separated language codes, e.g. "en,fr". Empty disables subtitles. */
+  subtitle_langs: string;
   /** Where the history database lives. Read-only - the server sets it. */
   db_path?: string;
 }

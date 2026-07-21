@@ -6,7 +6,24 @@ function bytes(n: number | null): string | null {
   return mb >= 1024 ? `${(mb / 1024).toFixed(2)} GB` : `${mb.toFixed(1)} MB`;
 }
 
-export default function JobProgress({ job }: { job: Job }) {
+export default function JobProgress({
+  job,
+  onCancel,
+}: {
+  job: Job;
+  onCancel: (id: string) => void;
+}) {
+  if (job.status === "cancelled") {
+    return (
+      <div className="panel outcome">
+        <div className="outcome-body">
+          <span className="outcome-label">Stopped</span>
+          <p className="outcome-msg">Download cancelled.</p>
+        </div>
+      </div>
+    );
+  }
+
   if (job.status === "error") {
     return (
       <div className="panel panel-bad outcome">
@@ -37,7 +54,12 @@ export default function JobProgress({ job }: { job: Job }) {
     <div className={`panel${running ? "" : " transfer-idle"}`}>
       <div className="transfer-head">
         <span className="eyebrow">{running ? "Transferring" : "Starting"}</span>
-        <span className="transfer-pct">{job.progress.toFixed(0)}%</span>
+        <span className="queue-head-right">
+          <span className="transfer-pct">{job.progress.toFixed(0)}%</span>
+          <button className="link" onClick={() => onCancel(job.id)}>
+            Stop
+          </button>
+        </span>
       </div>
 
       <div

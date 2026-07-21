@@ -27,20 +27,32 @@ def test_routes_to_expected_provider(url: str, expected: str) -> None:
     assert resolve_provider(url).name == expected
 
 
+@pytest.mark.parametrize("url", ["not a url", "", "   ", "ftp://example.com/x", "javascript:alert(1)"])
+def test_rejects_things_that_are_not_links(url: str) -> None:
+    with pytest.raises(ProviderError):
+        resolve_provider(url)
+
+
 @pytest.mark.parametrize(
     "url",
     [
         "https://vimeo.com/12345",
-        "https://twitter.com/x/status/1",
-        "not a url",
-        "",
-        # A bare profile is a feed, not a post. Playlist expansion is YouTube-only.
+        "https://www.tiktok.com/@someone/video/123",
+        "https://x.com/someone/status/1",
+        "https://soundcloud.com/artist/track",
+        # A bare Instagram profile is a feed, not a post, so the dedicated
+        # provider passes and the fallback takes it.
         "https://www.instagram.com/someuser/",
     ],
 )
-def test_rejects_unsupported_urls(url: str) -> None:
-    with pytest.raises(ProviderError):
-        resolve_provider(url)
+def test_unclaimed_links_fall_through_to_generic(url: str) -> None:
+    assert resolve_provider(url).name == "generic"
+
+
+def test_dedicated_providers_still_win_over_generic() -> None:
+    assert resolve_provider("https://youtu.be/abc").name == "youtube"
+    assert resolve_provider("https://www.instagram.com/reel/Cxyz/").name == "instagram"
+    assert resolve_provider("https://www.threads.com/@a/post/b").name == "threads"
 
 
 def test_whitespace_is_tolerated() -> None:
@@ -144,3 +156,16 @@ def test_finished_stream_is_downloadable() -> None:
 
 def test_live_detected_through_playlist_wrapper() -> None:
     assert YtDlpProvider._is_live({"_type": "playlist", "entries": [{"is_live": True}]}) is True
+
+
+def test_unknown_codecs_are_not_treated_as_an_image() -> None:
+    """Many extractors leave vcodec/acodec unset. Reading "not reported" as
+    "not present" made direct video links look like stills, which hid the
+    quality picker and mislabelled them in the preview."""
+    info = {"ext": "webm", "formats": [{"ext": "webm", "vcodec": None, "acodec": None}]}
+    assert YtDlpProvider._is_image(info) is False
+
+
+def test_image_formats_are_still_detected() -> None:
+    info = {"ext": "jpg", "formats": [{"ext": "jpg"}, {"ext": "webp"}]}
+    assert YtDlpProvider._is_image(info) is True
