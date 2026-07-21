@@ -5,6 +5,20 @@
 A local media downloader for YouTube, Instagram and Threads. Paste a link, see a preview, get the
 original file. Everything runs on your own machine: no account, no server, no external service.
 
+## Features
+
+- **Three platforms.** YouTube videos and Shorts, Instagram posts and Reels, Threads posts.
+- **Preview before you commit.** Title, author, thumbnail, duration and the qualities on offer.
+- **Batch downloads.** Paste any number of links at once and queue them together.
+- **Playlist expansion.** Paste a playlist and it lists its items, up to 200, in a couple of
+  seconds without fetching a single video.
+- **One quality for a whole queue**, chosen as a cap so mixed items each get their best.
+- **Paste to download**, optional: one paste analyzes and fetches at top quality, no clicks.
+- **Live transfer readout** with progress, speed, bytes moved and time remaining.
+- **History** of everything downloaded, kept in a local SQLite database.
+- **Polite by default.** Downloads are paced per platform, and live broadcasts are refused
+  rather than left running forever.
+
 ---
 
 ## ⚠️ Read this before running it
@@ -156,7 +170,7 @@ directly, so swapping HTTP for Tauri commands is a one-file change.
 
 ## Not implemented
 
-Tauri packaging, multi-account, cloud sync, playlist and batch downloads, mobile sync, sharing.
+Tauri desktop packaging, multiple accounts per platform, cloud sync, mobile sync, sharing.
 
 ## License
 

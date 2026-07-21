@@ -34,7 +34,7 @@ def test_routes_to_expected_provider(url: str, expected: str) -> None:
         "https://twitter.com/x/status/1",
         "not a url",
         "",
-        # A bare profile is not a downloadable post - playlists are out of scope.
+        # A bare profile is a feed, not a post. Playlist expansion is YouTube-only.
         "https://www.instagram.com/someuser/",
     ],
 )
