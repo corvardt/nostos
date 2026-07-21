@@ -57,6 +57,15 @@ Set `NOSTOS_DATA_DIR` to move the database somewhere else.
 3. Turn on **Download on paste** in Settings to skip both clicks. Pasting a link then analyzes
    and downloads it at the highest quality automatically.
 
+**Batch:** paste several links at once (any separator) and Nostos offers to queue them all.
+**Playlists:** paste a playlist URL and it expands to its items first. Both show a confirm step
+with the count before anything is queued, so a stray paste can never start downloads on its own,
+even with paste-to-download enabled.
+
+Downloads are paced per platform: YouTube runs three at a time, Instagram and Threads one at a
+time with a short gap, because they throttle bursts. Live broadcasts are refused, since they
+never finish and would hold a worker open indefinitely.
+
 ## Platform notes
 
 Open **Settings** and pick the browser you are signed in with; Nostos reuses that browser's

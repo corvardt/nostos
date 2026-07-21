@@ -8,16 +8,24 @@ from fastapi import APIRouter, HTTPException
 from . import config, db, jobs
 from .models import (
     AnalyzeRequest,
+    BatchDownloadRequest,
+    BatchItem,
+    BatchResponse,
     DownloadRequest,
     DownloadResponse,
     HistoryEntry,
     Job,
     MediaInfo,
+    Playlist,
+    PlaylistEntry,
     Settings,
 )
 from .providers import ProviderError, resolve_provider
 
 router = APIRouter()
+
+# A guard against a stray paste queueing thousands of downloads.
+MAX_BATCH = 200
 
 
 @router.post("/analyze", response_model=MediaInfo)
@@ -43,6 +51,72 @@ async def download(req: DownloadRequest) -> DownloadResponse:
 
     job_id = jobs.start(req.url, req.format, provider)
     return DownloadResponse(status="started", jobId=job_id)
+
+
+@router.post("/expand", response_model=Playlist)
+async def expand(req: AnalyzeRequest) -> Playlist:
+    """List a playlist's items so the UI can confirm before queueing them."""
+    try:
+        provider = resolve_provider(req.url)
+    except ProviderError as exc:
+        raise HTTPException(status_code=400, detail=exc.message) from exc
+
+    expander = getattr(provider, "expand_playlist", None)
+    if expander is None:
+        raise HTTPException(
+            status_code=400, detail=f"{provider.name} does not support playlists."
+        )
+
+    try:
+        title, entries, truncated = await anyio.to_thread.run_sync(
+            expander, req.url, MAX_BATCH
+        )
+    except ProviderError as exc:
+        raise HTTPException(status_code=422 if exc.needs_auth else 400, detail=exc.message) from exc
+
+    return Playlist(
+        title=title,
+        count=len(entries),
+        truncated=truncated,
+        entries=[
+            PlaylistEntry(
+                url=e.get("url") or e.get("webpage_url") or "",
+                title=e.get("title"),
+                thumbnail=(e.get("thumbnails") or [{}])[0].get("url"),
+            )
+            for e in entries
+            if e.get("url") or e.get("webpage_url")
+        ],
+    )
+
+
+@router.post("/download/batch", response_model=BatchResponse)
+async def download_batch(req: BatchDownloadRequest) -> BatchResponse:
+    """Queue many URLs at once. Unsupported ones are reported, not fatal."""
+    if not req.urls:
+        raise HTTPException(status_code=400, detail="No URLs provided.")
+    if len(req.urls) > MAX_BATCH:
+        raise HTTPException(
+            status_code=400,
+            detail=f"That is {len(req.urls)} links. The limit is {MAX_BATCH} per batch.",
+        )
+
+    items: list[BatchItem] = []
+    seen: set[str] = set()
+    for raw in req.urls:
+        url = raw.strip()
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        try:
+            provider = resolve_provider(url)
+        except ProviderError as exc:
+            items.append(BatchItem(url=url, error=exc.message))
+            continue
+        items.append(BatchItem(url=url, jobId=jobs.start(url, req.format, provider)))
+
+    accepted = sum(1 for i in items if i.jobId)
+    return BatchResponse(accepted=accepted, rejected=len(items) - accepted, items=items)
 
 
 @router.get("/jobs/{job_id}", response_model=Job)

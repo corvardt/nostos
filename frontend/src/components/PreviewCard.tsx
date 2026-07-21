@@ -33,9 +33,15 @@ export default function PreviewCard({ info }: { info: MediaInfo }) {
           <span className="source-dot" />
           <span className="eyebrow">{info.platform}</span>
           {info.is_image && <span className="eyebrow">· image</span>}
+          {info.is_live && <span className="eyebrow live">· live</span>}
         </div>
         <h2 className="preview-title">{info.title}</h2>
         {info.author && <p className="preview-author">{info.author}</p>}
+        {info.is_live && (
+          <p className="hint">
+            Live broadcasts cannot be downloaded until the stream ends.
+          </p>
+        )}
       </div>
     </div>
   );

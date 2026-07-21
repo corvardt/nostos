@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import re
 import threading
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -31,7 +32,29 @@ def _plain(value: str | None) -> str | None:
 
 _jobs: dict[str, Job] = {}
 _lock = threading.Lock()
-_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="nostos-dl")
+
+# One executor per platform, so a batch is paced by what that platform tolerates.
+# YouTube is happy with parallel downloads. Instagram and Threads throttle or
+# soft-ban on bursts, and the Threads provider costs two page fetches per item
+# (once to resolve, once to download), so both are serialised.
+_WORKERS = {"youtube": 3, "instagram": 1, "threads": 1}
+_DEFAULT_WORKERS = 1
+
+# Seconds to wait before starting an item, for platforms that dislike bursts.
+_PACING = {"instagram": 2.0, "threads": 2.0}
+
+_executors: dict[str, ThreadPoolExecutor] = {
+    name: ThreadPoolExecutor(max_workers=count, thread_name_prefix=f"nostos-{name}")
+    for name, count in _WORKERS.items()
+}
+
+
+def _executor_for(platform: str) -> ThreadPoolExecutor:
+    if platform not in _executors:
+        _executors[platform] = ThreadPoolExecutor(
+            max_workers=_DEFAULT_WORKERS, thread_name_prefix=f"nostos-{platform}"
+        )
+    return _executors[platform]
 
 
 def get(job_id: str) -> Job | None:
@@ -52,11 +75,17 @@ def start(url: str, fmt: str | None, provider: Provider, title: str | None = Non
     job_id = uuid.uuid4().hex[:12]
     with _lock:
         _jobs[job_id] = Job(id=job_id, url=url, platform=provider.name, title=title)
-    _executor.submit(_run, job_id, url, fmt, provider)
+    _executor_for(provider.name).submit(_run, job_id, url, fmt, provider)
     return job_id
 
 
 def _run(job_id: str, url: str, fmt: str | None, provider: Provider) -> None:
+    # Queued items wait their turn in the executor; pace the throttled platforms
+    # so a long batch does not arrive as a burst.
+    delay = _PACING.get(provider.name)
+    if delay:
+        time.sleep(delay)
+
     _update(job_id, status="running")
 
     def on_progress(payload: dict) -> None:

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from yt_dlp import YoutubeDL
-from yt_dlp.utils import DownloadError, ExtractorError
+from yt_dlp.utils import DownloadError, ExtractorError, match_filter_func
 
 from .. import config
 from ..models import Format, MediaInfo
@@ -64,6 +64,34 @@ class YtDlpProvider(Provider):
                 opts["cookiesfrombrowser"] = (browser,)
         return opts
 
+    # --------------------------------------------------------------- playlist
+
+    def expand_playlist(self, url: str, limit: int) -> tuple[str, list[dict[str, Any]], bool]:
+        """List a playlist's items without fetching any of them.
+
+        `extract_flat` returns ids, titles and URLs from the index pages alone,
+        which is why a long playlist expands in about a second.
+        """
+        opts = self.base_opts()
+        opts.update({
+            "noplaylist": False,
+            "extract_flat": "in_playlist",
+            "playlistend": limit + 1,  # one extra, to detect truncation
+        })
+
+        try:
+            with YoutubeDL(opts) as ydl:
+                info = ydl.extract_info(url, download=False)
+        except (DownloadError, ExtractorError) as exc:
+            raise self._translate(exc) from exc
+
+        if not info or info.get("_type") != "playlist":
+            raise ProviderError("That URL is not a playlist.")
+
+        entries = [e for e in (info.get("entries") or []) if e]
+        truncated = len(entries) > limit
+        return (info.get("title") or "Playlist", entries[:limit], truncated)
+
     # ---------------------------------------------------------------- resolve
 
     def resolve(self, url: str) -> MediaInfo:
@@ -94,9 +122,17 @@ class YtDlpProvider(Provider):
             thumbnail=info.get("thumbnail"),
             duration=info.get("duration"),
             is_image=is_image,
+            is_live=self._is_live(info),
             webpage_url=info.get("webpage_url"),
             formats=[] if is_image else self._simplify_formats(info),
         )
+
+    @staticmethod
+    def _is_live(info: dict[str, Any]) -> bool:
+        """Currently broadcasting. A finished stream ("was_live") is fine."""
+        if info.get("_type") == "playlist" and info.get("entries"):
+            info = next((e for e in info["entries"] if e), info)
+        return bool(info.get("is_live")) or info.get("live_status") == "is_live"
 
     @staticmethod
     def _is_image(info: dict[str, Any]) -> bool:
@@ -170,6 +206,9 @@ class YtDlpProvider(Provider):
                 "restrictfilenames": True,
                 "merge_output_format": "mp4",
                 "windowsfilenames": True,
+                # A live broadcast downloads in real time and never completes,
+                # holding a worker forever. Refuse it rather than hang.
+                "match_filter": match_filter_func("!is_live"),
             }
         )
         # "best" needs an explicit selector so ffmpeg muxes video+audio together.
@@ -182,6 +221,14 @@ class YtDlpProvider(Provider):
                 info = ydl.extract_info(url, download=True)
         except (DownloadError, ExtractorError) as exc:
             raise self._translate(exc) from exc
+
+        # match_filter skips the item but still returns its info dict, so the
+        # live case is detected here rather than by a None return.
+        if info is None or self._is_live(info):
+            raise ProviderError(
+                "This is a live broadcast. Nostos does not download live streams; "
+                "try again once the stream has ended and been published."
+            )
 
         path = self._final_path(info)
         if not path:

@@ -3,7 +3,7 @@
 // Components must never call fetch() directly. When this app is wrapped in Tauri,
 // only the bodies below change (HTTP -> `invoke()`), and no component is touched.
 
-import type { HistoryEntry, Job, MediaInfo, Settings } from "./types";
+import type { BatchResponse, HistoryEntry, Job, MediaInfo, Playlist, Settings } from "./types";
 
 const BASE = "/api";
 
@@ -51,6 +51,15 @@ export const download = (url: string, format: string) =>
   request<{ status: string; jobId: string }>("/download", {
     method: "POST",
     body: JSON.stringify({ url, format }),
+  });
+
+export const expand = (url: string) =>
+  request<Playlist>("/expand", { method: "POST", body: JSON.stringify({ url }) });
+
+export const downloadBatch = (urls: string[], format: string) =>
+  request<BatchResponse>("/download/batch", {
+    method: "POST",
+    body: JSON.stringify({ urls, format }),
   });
 
 export const getJob = (id: string) => request<Job>(`/jobs/${id}`);

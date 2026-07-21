@@ -124,3 +124,23 @@ def test_plain_handles_empty_and_uncoloured_values() -> None:
     assert _plain("") is None
     assert _plain(None) is None
     assert _plain("\x1b[0;32m\x1b[0m") is None
+
+
+# ------------------------------------------------------------ live streams
+
+
+def test_live_stream_is_detected() -> None:
+    """A running broadcast never finishes downloading, so it must be refused
+    rather than left to occupy a worker forever."""
+    assert YtDlpProvider._is_live({"is_live": True}) is True
+    assert YtDlpProvider._is_live({"live_status": "is_live"}) is True
+
+
+def test_finished_stream_is_downloadable() -> None:
+    assert YtDlpProvider._is_live({"live_status": "was_live"}) is False
+    assert YtDlpProvider._is_live({"live_status": "not_live"}) is False
+    assert YtDlpProvider._is_live({}) is False
+
+
+def test_live_detected_through_playlist_wrapper() -> None:
+    assert YtDlpProvider._is_live({"_type": "playlist", "entries": [{"is_live": True}]}) is True

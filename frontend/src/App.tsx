@@ -1,20 +1,47 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import FormatPicker from "./components/FormatPicker";
 import HistoryList from "./components/HistoryList";
 import JobProgress from "./components/JobProgress";
 import PreviewCard from "./components/PreviewCard";
+import QueueList from "./components/QueueList";
 import SettingsPanel from "./components/SettingsPanel";
 import * as api from "./lib/api";
 import type { HistoryEntry, Job, MediaInfo, Settings } from "./lib/types";
+import { extractUrls, looksLikePlaylist } from "./lib/urls";
 import markUrl from "../assets/down.png";
 
 const POLL_MS = 500;
+
+/** A confirmed-before-queueing set of links: a paste of many, or a playlist. */
+interface Pending {
+  urls: string[];
+  title?: string;
+  truncated?: boolean;
+}
+
+function blankJob(id: string, url: string, media?: MediaInfo | null): Job {
+  return {
+    id,
+    url,
+    platform: media?.platform ?? null,
+    title: media?.title ?? null,
+    status: "queued",
+    progress: 0,
+    speed: null,
+    eta: null,
+    downloaded_bytes: null,
+    total_bytes: null,
+    filepath: null,
+    error: null,
+  };
+}
 
 export default function App() {
   const [url, setUrl] = useState("");
   const [info, setInfo] = useState<MediaInfo | null>(null);
   const [format, setFormat] = useState("best");
-  const [job, setJob] = useState<Job | null>(null);
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -30,25 +57,29 @@ export default function App() {
     api.getSettings().then(setSettings).catch(() => {});
   }, [refreshHistory]);
 
-  // Poll the active job until it reaches a terminal state.
-  const pollRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (!job || job.status === "done" || job.status === "error") return;
+  // Poll every unfinished job on one timer. Keyed on the active ids so the
+  // interval is rebuilt when the set changes, not on every progress tick.
+  const activeIds = useMemo(
+    () => jobs.filter((j) => j.status !== "done" && j.status !== "error").map((j) => j.id),
+    [jobs],
+  );
+  const activeKey = activeIds.join(",");
 
-    pollRef.current = window.setInterval(async () => {
-      try {
-        const next = await api.getJob(job.id);
-        setJob(next);
-        if (next.status === "done" || next.status === "error") refreshHistory();
-      } catch {
-        // A transient poll failure is not worth tearing the UI down over.
-      }
+  useEffect(() => {
+    if (!activeKey) return;
+    const ids = activeKey.split(",");
+
+    const timer = window.setInterval(async () => {
+      const updates = await Promise.all(ids.map((id) => api.getJob(id).catch(() => null)));
+      const fresh = updates.filter((j): j is Job => j !== null);
+      if (fresh.length === 0) return;
+
+      setJobs((prev) => prev.map((j) => fresh.find((f) => f.id === j.id) ?? j));
+      if (fresh.some((j) => j.status === "done" || j.status === "error")) refreshHistory();
     }, POLL_MS);
 
-    return () => {
-      if (pollRef.current) window.clearInterval(pollRef.current);
-    };
-  }, [job, refreshHistory]);
+    return () => window.clearInterval(timer);
+  }, [activeKey, refreshHistory]);
 
   function reportError(err: unknown) {
     const needsAuth = err instanceof api.ApiError && err.needsAuth;
@@ -59,7 +90,7 @@ export default function App() {
     setAnalyzing(true);
     setError(null);
     setInfo(null);
-    setJob(null);
+    setPending(null);
     try {
       const result = await api.analyze(raw);
       setInfo(result);
@@ -76,50 +107,112 @@ export default function App() {
   /** `media` is passed explicitly because the paste flow runs before state settles. */
   async function runDownload(raw: string, fmt: string, media?: MediaInfo | null) {
     setError(null);
-    const source = media ?? info;
     try {
       const { jobId } = await api.download(raw, fmt);
-      setJob({
-        id: jobId,
-        url: raw,
-        platform: source?.platform ?? null,
-        title: source?.title ?? null,
-        status: "queued",
-        progress: 0,
-        speed: null,
-        eta: null,
-        downloaded_bytes: null,
-        total_bytes: null,
-        filepath: null,
-        error: null,
-      });
+      setJobs((prev) => [blankJob(jobId, raw, media ?? info), ...prev]);
     } catch (err) {
       reportError(err);
     }
   }
 
-  async function onAnalyze(e: React.FormEvent) {
-    e.preventDefault();
-    if (!url.trim()) return;
-    await runAnalyze(url.trim());
+  async function runBatch(urls: string[]) {
+    setError(null);
+    setInfo(null);
+    try {
+      const result = await api.downloadBatch(urls, "best");
+      const started = result.items
+        .filter((i) => i.jobId)
+        .map((i) => blankJob(i.jobId!, i.url));
+      setJobs((prev) => [...started, ...prev]);
+      setPending(null);
+      setUrl("");
+      if (result.rejected > 0) {
+        const first = result.items.find((i) => i.error);
+        setError({
+          message: `${result.accepted} queued, ${result.rejected} skipped. ${first?.error ?? ""}`,
+          needsAuth: false,
+        });
+      }
+    } catch (err) {
+      reportError(err);
+    }
   }
 
-  /** Paste-to-download: analyze the pasted link, then fetch it at best quality. */
+  async function runExpand(raw: string) {
+    setAnalyzing(true);
+    setError(null);
+    setInfo(null);
+    try {
+      const list = await api.expand(raw);
+      if (list.count === 0) {
+        setError({ message: "That playlist has no items.", needsAuth: false });
+        return;
+      }
+      setPending({
+        urls: list.entries.map((e) => e.url),
+        title: list.title,
+        truncated: list.truncated,
+      });
+    } catch (err) {
+      reportError(err);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const urls = extractUrls(url);
+    if (urls.length > 1) {
+      setPending({ urls });
+      return;
+    }
+    const one = url.trim();
+    if (!one) return;
+    // A playlist expands to a confirm step; a single link previews as before.
+    if (looksLikePlaylist(one)) {
+      await runExpand(one);
+      return;
+    }
+    await runAnalyze(one);
+  }
+
   function onPaste(e: React.ClipboardEvent<HTMLInputElement>) {
-    if (!settings?.auto_download) return;
-    const pasted = e.clipboardData.getData("text").trim();
-    if (!/^https?:\/\/\S+$/i.test(pasted)) return;
+    const text = e.clipboardData.getData("text");
+    const urls = extractUrls(text);
 
-    e.preventDefault();
-    setUrl(pasted);
-    void (async () => {
-      const media = await runAnalyze(pasted);
-      // formats[0] is always "best"; image posts expose none and ignore it.
-      if (media) await runDownload(pasted, "best", media);
-    })();
+    // Several links at once is always a batch, and always needs confirming:
+    // a stray paste must never start dozens of downloads on its own.
+    if (urls.length > 1) {
+      e.preventDefault();
+      setUrl(text.trim());
+      setInfo(null);
+      setError(null);
+      setPending({ urls });
+      return;
+    }
+
+    // Never auto-download a playlist: expanding it needs confirming first.
+    if (urls.length === 1 && looksLikePlaylist(urls[0])) {
+      e.preventDefault();
+      setUrl(urls[0]);
+      void runExpand(urls[0]);
+      return;
+    }
+
+    if (urls.length === 1 && settings?.auto_download) {
+      e.preventDefault();
+      setUrl(urls[0]);
+      setPending(null);
+      void (async () => {
+        const media = await runAnalyze(urls[0]);
+        if (media) await runDownload(urls[0], "best", media);
+      })();
+    }
   }
 
-  const busy = job !== null && job.status !== "done" && job.status !== "error";
+  const busy = jobs.some((j) => j.status !== "done" && j.status !== "error");
+  const singleJob = jobs.length === 1 ? jobs[0] : null;
 
   return (
     <div className="app">
@@ -139,7 +232,7 @@ export default function App() {
 
       {showSettings && settings && <SettingsPanel settings={settings} onSaved={setSettings} />}
 
-      <form className="intake" onSubmit={onAnalyze}>
+      <form className="intake" onSubmit={onSubmit}>
         <input
           className="input"
           placeholder={
@@ -160,6 +253,30 @@ export default function App() {
       </form>
 
       <div className="stack">
+        {pending && (
+          <div className="panel batch">
+            <div className="batch-body">
+              <span className="eyebrow">{pending.title ? "Playlist" : "Batch"}</span>
+              <p className="batch-count">
+                <strong className="num">{pending.urls.length}</strong>
+                {pending.urls.length === 1 ? " link" : " links"} ready
+              </p>
+              {pending.title && <p className="batch-sub">{pending.title}</p>}
+              {pending.truncated && (
+                <p className="batch-sub">Only the first {pending.urls.length} will be queued.</p>
+              )}
+            </div>
+            <div className="batch-actions">
+              <button className="btn" onClick={() => setPending(null)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={() => runBatch(pending.urls)}>
+                Download all
+              </button>
+            </div>
+          </div>
+        )}
+
         {error && (
           <div className="panel panel-bad outcome">
             <div className="outcome-body">
@@ -187,7 +304,7 @@ export default function App() {
               <button
                 className="btn btn-primary"
                 onClick={() => runDownload(url.trim(), format)}
-                disabled={busy}
+                disabled={busy || info.is_live}
               >
                 {busy ? "Downloading…" : "Download"}
               </button>
@@ -195,7 +312,8 @@ export default function App() {
           </>
         )}
 
-        {job && <JobProgress job={job} />}
+        {/* One download keeps the full instrument readout; a queue gets rows. */}
+        {singleJob ? <JobProgress job={singleJob} /> : jobs.length > 1 && <QueueList jobs={jobs} />}
       </div>
 
       <section className="ledger">

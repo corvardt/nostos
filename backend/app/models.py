@@ -27,6 +27,7 @@ class MediaInfo(BaseModel):
     thumbnail: str | None = None
     duration: float | None = None
     is_image: bool = False
+    is_live: bool = False
     webpage_url: str | None = None
     formats: list[Format] = Field(default_factory=list)
 
@@ -43,6 +44,38 @@ class DownloadRequest(BaseModel):
 class DownloadResponse(BaseModel):
     status: Literal["started"] = "started"
     jobId: str  # noqa: N815 - the spec names this field `jobId`
+
+
+class PlaylistEntry(BaseModel):
+    url: str
+    title: str | None = None
+    thumbnail: str | None = None
+
+
+class Playlist(BaseModel):
+    title: str
+    count: int
+    entries: list[PlaylistEntry]
+    truncated: bool = False
+
+
+class BatchDownloadRequest(BaseModel):
+    urls: list[str]
+    format: str | None = "best"
+
+
+class BatchItem(BaseModel):
+    """One URL's outcome. A rejected URL reports why, rather than failing the lot."""
+
+    url: str
+    jobId: str | None = None  # noqa: N815 - matches DownloadResponse
+    error: str | None = None
+
+
+class BatchResponse(BaseModel):
+    accepted: int
+    rejected: int
+    items: list[BatchItem]
 
 
 class Job(BaseModel):

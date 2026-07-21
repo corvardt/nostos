@@ -18,6 +18,7 @@ export interface MediaInfo {
   thumbnail: string | null;
   duration: number | null;
   is_image: boolean;
+  is_live: boolean;
   webpage_url: string | null;
   formats: Format[];
 }
@@ -35,6 +36,31 @@ export interface Job {
   total_bytes: number | null;
   filepath: string | null;
   error: string | null;
+}
+
+export interface PlaylistEntry {
+  url: string;
+  title: string | null;
+  thumbnail: string | null;
+}
+
+export interface Playlist {
+  title: string;
+  count: number;
+  entries: PlaylistEntry[];
+  truncated: boolean;
+}
+
+export interface BatchItem {
+  url: string;
+  jobId: string | null;
+  error: string | null;
+}
+
+export interface BatchResponse {
+  accepted: number;
+  rejected: number;
+  items: BatchItem[];
 }
 
 export interface HistoryEntry {

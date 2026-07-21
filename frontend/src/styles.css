@@ -600,6 +600,124 @@ body {
   font-size: 14px;
 }
 
+/* ---------------------------------------------------------------- batch */
+
+.batch {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.batch-count {
+  margin: 4px 0 0;
+  font-size: 15px;
+}
+
+.batch-count .num {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+  margin-right: 4px;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ---------------------------------------------------------------- queue */
+
+.queue-tally {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate);
+}
+
+.queue-failed {
+  color: var(--bad);
+}
+
+.queue {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.queue-item:last-child {
+  border-bottom: none;
+}
+
+.queue-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.queue-bar {
+  width: 72px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--sunken);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.queue-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--azure-bright), var(--azure-deep));
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.queue-state {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--slate);
+  width: 46px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.queue-dot-done {
+  background: var(--ok);
+}
+
+.queue-dot-error {
+  background: var(--bad);
+}
+
+.queue-dot-running {
+  background: var(--azure);
+}
+
+.queue-dot-queued {
+  background: var(--rule);
+}
+
+@media (max-width: 560px) {
+  .queue-bar {
+    display: none;
+  }
+}
+
 /* --------------------------------------------------------------- footer */
 
 .footer {
@@ -747,4 +865,29 @@ body {
     flex-direction: column;
     gap: 4px;
   }
+}
+
+.batch-body {
+  min-width: 0;
+}
+
+.batch-sub {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--slate);
+  font-family: var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 340px;
+}
+
+.eyebrow.live {
+  color: var(--bad);
+}
+
+.hint {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--slate);
 }
