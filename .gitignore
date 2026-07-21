@@ -35,3 +35,6 @@ cookies.txt
 .DS_Store
 Thumbs.db
 *.swp
+
+# Original spec document, kept locally but not published
+Personal Media Downloader.pdf
