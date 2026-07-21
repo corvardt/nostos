@@ -13,10 +13,9 @@ import markUrl from "../assets/down.png";
 
 const POLL_MS = 500;
 
-// How long a finished queue stays on screen before clearing itself, and how
-// long the fade runs before it goes.
-const CLEAR_MS = 8000;
-const FADE_MS = 500;
+// How long a completed item stays visible before it clears itself. Failed and
+// stopped items are never auto-cleared: they are the ones you may want to retry.
+const DONE_LINGER_MS = 4000;
 
 /** A confirmed-before-queueing set of links: a paste of many, or a playlist. */
 interface Pending {
@@ -29,6 +28,7 @@ function blankJob(id: string, url: string, media?: MediaInfo | null): Job {
   return {
     id,
     url,
+    format: null,
     platform: media?.platform ?? null,
     title: media?.title ?? null,
     status: "queued",
@@ -49,7 +49,6 @@ export default function App() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
   const [batchFormat, setBatchFormat] = useState("best");
-  const [fading, setFading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -89,23 +88,16 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [activeKey, refreshHistory]);
 
-  // A queue that finished cleanly clears itself, so the panel does not linger
-  // over the next paste. Anything that failed stays put: the error text lives
-  // only here, since history records the status but not the reason.
+  // Completed items retire themselves one by one, so what remains on screen is
+  // exactly the work that still needs a decision: failed and stopped downloads.
   useEffect(() => {
-    if (jobs.length === 0) return;
-    const settled = jobs.every((j) => j.status === "done" || j.status === "error" || j.status === "cancelled");
-    if (!settled || jobs.some((j) => j.status === "error")) return;
+    const finished = jobs.filter((j) => j.status === "done").map((j) => j.id);
+    if (finished.length === 0) return;
 
-    const fade = window.setTimeout(() => setFading(true), CLEAR_MS - FADE_MS);
-    const clear = window.setTimeout(() => {
-      setJobs([]);
-      setFading(false);
-    }, CLEAR_MS);
-    return () => {
-      window.clearTimeout(fade);
-      window.clearTimeout(clear);
-    };
+    const timer = window.setTimeout(() => {
+      setJobs((prev) => prev.filter((j) => !finished.includes(j.id)));
+    }, DONE_LINGER_MS);
+    return () => window.clearTimeout(timer);
   }, [jobs]);
 
   async function onCancel(id: string) {
@@ -121,6 +113,28 @@ export default function App() {
       ),
     );
     await api.cancelAll().catch(() => {});
+  }
+
+  async function onRetry(id: string) {
+    try {
+      const { jobId } = await api.retryJob(id);
+      const previous = jobs.find((j) => j.id === id);
+      // Swap the dead row for the fresh attempt, keeping its place in the list.
+      setJobs((prev) =>
+        prev.map((j) =>
+          j.id === id
+            ? { ...blankJob(jobId, j.url), format: j.format, title: previous?.title ?? null }
+            : j,
+        ),
+      );
+    } catch (err) {
+      reportError(err);
+    }
+  }
+
+  async function onClearQueue() {
+    await api.cancelAll().catch(() => {});
+    setJobs([]);
   }
 
   function reportError(err: unknown) {
@@ -151,7 +165,6 @@ export default function App() {
     setError(null);
     try {
       const { jobId } = await api.download(raw, fmt);
-      setFading(false);
       setJobs((prev) => [blankJob(jobId, raw, media ?? info), ...prev]);
     } catch (err) {
       reportError(err);
@@ -166,16 +179,17 @@ export default function App() {
       const started = result.items
         .filter((i) => i.jobId)
         .map((i) => blankJob(i.jobId!, i.url));
-      setFading(false);
       setJobs((prev) => [...started, ...prev]);
       setPending(null);
       setUrl("");
-      if (result.rejected > 0) {
-        const first = result.items.find((i) => i.error);
-        setError({
-          message: `${result.accepted} queued, ${result.rejected} skipped. ${first?.error ?? ""}`,
-          needsAuth: false,
-        });
+      if (result.rejected > 0 || result.skipped > 0) {
+        const parts = [`${result.accepted} queued`];
+        if (result.skipped > 0) parts.push(`${result.skipped} already downloaded`);
+        if (result.rejected > 0) {
+          const first = result.items.find((i) => i.error && !i.skipped);
+          parts.push(`${result.rejected} could not be queued: ${first?.error ?? ""}`);
+        }
+        setError({ message: parts.join(", ") + ".", needsAuth: false });
       }
     } catch (err) {
       reportError(err);
@@ -274,7 +288,11 @@ export default function App() {
         </button>
       </header>
 
-      {showSettings && settings && <SettingsPanel settings={settings} onSaved={setSettings} />}
+      {showSettings && settings && <SettingsPanel
+          settings={settings}
+          onSaved={setSettings}
+          onHistoryCleared={refreshHistory}
+        />}
 
       <form className="intake" onSubmit={onSubmit}>
         <input
@@ -367,15 +385,18 @@ export default function App() {
         )}
 
         {/* One download keeps the full instrument readout; a queue gets rows. */}
-        {jobs.length > 0 && (
-          <div className={fading ? "settling" : undefined}>
-            {singleJob ? (
-              <JobProgress job={singleJob} onCancel={onCancel} />
-            ) : (
-              <QueueList jobs={jobs} onCancel={onCancel} onCancelAll={onCancelAll} />
-            )}
-          </div>
-        )}
+        {jobs.length > 0 &&
+          (singleJob ? (
+            <JobProgress job={singleJob} onCancel={onCancel} onRetry={onRetry} />
+          ) : (
+            <QueueList
+              jobs={jobs}
+              onCancel={onCancel}
+              onCancelAll={onCancelAll}
+              onRetry={onRetry}
+              onClear={onClearQueue}
+            />
+          ))}
       </div>
 
       <section className="ledger">

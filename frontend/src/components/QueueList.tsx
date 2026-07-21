@@ -23,33 +23,46 @@ interface Props {
   jobs: Job[];
   onCancel: (id: string) => void;
   onCancelAll: () => void;
+  onRetry: (id: string) => void;
+  onClear: () => void;
 }
 
-export default function QueueList({ jobs, onCancel, onCancelAll }: Props) {
-  const done = jobs.filter((j) => j.status === "done").length;
-  const failed = jobs.filter((j) => j.status === "error").length;
+export default function QueueList({ jobs, onCancel, onCancelAll, onRetry, onClear }: Props) {
   const active = jobs.filter((j) => j.status === "queued" || j.status === "running");
+  const stalled = jobs.filter((j) => j.status === "error" || j.status === "cancelled");
 
   return (
     <div className="panel">
       <div className="transfer-head">
-        <span className="eyebrow">Queue</span>
+        <span className="eyebrow">
+          {active.length > 0 ? "Queue" : stalled.length > 0 ? "Unfinished" : "Queue"}
+        </span>
         <span className="queue-head-right">
           <span className="queue-tally">
-            {done}/{jobs.length}
-            {failed > 0 && <span className="queue-failed"> · {failed} failed</span>}
+            {active.length > 0 && `${active.length} left`}
+            {active.length > 0 && stalled.length > 0 && " · "}
+            {stalled.length > 0 && <span className="queue-failed">{stalled.length} unfinished</span>}
           </span>
+          {stalled.length > 1 && (
+            <button className="link" onClick={() => stalled.forEach((j) => onRetry(j.id))}>
+              Retry all
+            </button>
+          )}
           {active.length > 0 && (
             <button className="link" onClick={onCancelAll}>
               Stop all
             </button>
           )}
+          <button className="link" onClick={onClear} title="Stop everything and empty the queue">
+            Clear
+          </button>
         </span>
       </div>
 
       <ul className="queue">
         {jobs.map((job) => {
           const stoppable = job.status === "queued" || job.status === "running";
+          const retryable = job.status === "error" || job.status === "cancelled";
           return (
             <li key={job.id} className="queue-item">
               <span className={`row-status queue-dot-${job.status}`} title={job.status} />
@@ -62,6 +75,11 @@ export default function QueueList({ jobs, onCancel, onCancelAll }: Props) {
                 </span>
               )}
               <span className="queue-state">{stateText(job)}</span>
+              {retryable && (
+                <button className="queue-action" onClick={() => onRetry(job.id)}>
+                  Retry
+                </button>
+              )}
               {stoppable && (
                 <button
                   className="queue-stop"
@@ -76,6 +94,12 @@ export default function QueueList({ jobs, onCancel, onCancelAll }: Props) {
           );
         })}
       </ul>
+
+      {stalled.length > 0 && active.length === 0 && (
+        <p className="queue-note">
+          Finished downloads have cleared. These did not complete.
+        </p>
+      )}
     </div>
   );
 }

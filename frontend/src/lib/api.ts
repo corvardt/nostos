@@ -67,10 +67,16 @@ export const getJob = (id: string) => request<Job>(`/jobs/${id}`);
 export const cancelJob = (id: string) =>
   request<{ cancelled: boolean }>(`/jobs/${id}`, { method: "DELETE" });
 
+export const retryJob = (id: string) =>
+  request<{ status: string; jobId: string }>(`/jobs/${id}/retry`, { method: "POST" });
+
 export const cancelAll = () =>
   request<{ cancelled: number }>("/jobs", { method: "DELETE" });
 
 export const getHistory = () => request<HistoryEntry[]>("/history");
+
+export const clearHistory = () =>
+  request<{ cleared: number }>("/history", { method: "DELETE" });
 
 export const getSettings = () => request<Settings>("/settings");
 

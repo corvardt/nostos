@@ -9,9 +9,11 @@ function bytes(n: number | null): string | null {
 export default function JobProgress({
   job,
   onCancel,
+  onRetry,
 }: {
   job: Job;
   onCancel: (id: string) => void;
+  onRetry: (id: string) => void;
 }) {
   if (job.status === "cancelled") {
     return (
@@ -19,6 +21,9 @@ export default function JobProgress({
         <div className="outcome-body">
           <span className="outcome-label">Stopped</span>
           <p className="outcome-msg">Download cancelled.</p>
+          <button className="link" onClick={() => onRetry(job.id)}>
+            Try again
+          </button>
         </div>
       </div>
     );
@@ -30,6 +35,9 @@ export default function JobProgress({
         <div className="outcome-body">
           <span className="outcome-label">Failed</span>
           <p className="outcome-msg">{job.error ?? "The download did not finish."}</p>
+          <button className="link" onClick={() => onRetry(job.id)}>
+            Try again
+          </button>
         </div>
       </div>
     );

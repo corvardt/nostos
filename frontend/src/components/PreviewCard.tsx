@@ -37,6 +37,12 @@ export default function PreviewCard({ info }: { info: MediaInfo }) {
         </div>
         <h2 className="preview-title">{info.title}</h2>
         {info.author && <p className="preview-author">{info.author}</p>}
+        {info.already_downloaded && (
+          <p className="hint dup">
+            Already downloaded on {info.already_downloaded.slice(0, 10)}. Downloading again will
+            make a second copy.
+          </p>
+        )}
         {info.is_live && (
           <p className="hint">
             Live broadcasts cannot be downloaded until the stream ends.

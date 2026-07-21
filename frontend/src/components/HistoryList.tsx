@@ -31,9 +31,10 @@ export default function HistoryList({ entries }: { entries: HistoryEntry[] }) {
             href={e.url}
             target="_blank"
             rel="noreferrer noopener"
-            title={e.url}
+            title={e.error ?? e.filepath ?? e.url}
           >
             {e.title ?? e.url}
+            {e.error && <span className="row-reason"> {e.error}</span>}
           </a>
           <span className="row-meta">{e.platform}</span>
           <span className="row-meta">{shortTime(e.created_at)}</span>

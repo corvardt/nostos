@@ -20,7 +20,10 @@ original file. Everything runs on your own machine: no account, no server, no ex
 - **Stop anything mid-flight**, one item or the whole queue, and the partial files are cleaned up.
 - **Tagged files.** Title, artist, date, source URL, chapters and cover art are embedded into
   every download. Subtitles too, if you name the languages.
-- **History** of everything downloaded, kept in a local SQLite database.
+- **Retry** anything that failed or was stopped, at the quality first asked for.
+- **Skips what you already have.** Re-run a playlist and it only fetches the new items.
+- **History** of everything downloaded, with the reason for any failure. Clearable from
+  Settings, which never touches the files themselves.
 - **Polite by default.** Downloads are paced per platform, and live broadcasts are refused
   rather than left running forever.
 
@@ -87,9 +90,12 @@ queue there. The options are height *caps*, hence "up to 1080p": a queue's items
 format ladder, so each one gets the best it has at or below the cap.
 
 While a queue runs, a single download keeps the full transfer readout and several switch to
-compact rows with a running tally. A queue that finishes cleanly clears itself after a few
-seconds; if anything failed it stays put, because the reason is shown there and history records
-only the status.
+compact rows. Completed items retire themselves a few seconds after finishing, so what stays on
+screen is exactly what still needs a decision: the failed and stopped ones, each with a Retry
+button. `Clear` empties the queue outright, stopping anything still running.
+
+Re-queueing a URL already downloaded is skipped when the file is still on disk, so re-running a
+playlist only fetches what is new. Analyze says so too, before you click.
 
 Downloads are paced per platform: YouTube runs three at a time, Instagram and Threads one at a
 time with a short gap, because they throttle bursts.
@@ -163,7 +169,9 @@ Completed and failed jobs are written to SQLite (`db.py`).
 | GET | `/jobs/{id}` | progress and final path |
 | GET | `/history` | recent downloads |
 | DELETE | `/jobs/{id}` | stop one download |
+| POST | `/jobs/{id}/retry` | queue a failed or stopped job again |
 | DELETE | `/jobs` | stop everything queued or running |
+| DELETE | `/history` | empty the log, leaving files alone |
 | GET/PUT | `/settings` | download folder, browser, paste behaviour, subtitles |
 
 ## Development

@@ -115,7 +115,7 @@ def _update(job_id: str, **fields) -> None:
 def start(url: str, fmt: str | None, provider: Provider, title: str | None = None) -> str:
     job_id = uuid.uuid4().hex[:12]
     with _lock:
-        _jobs[job_id] = Job(id=job_id, url=url, platform=provider.name, title=title)
+        _jobs[job_id] = Job(id=job_id, url=url, format=fmt, platform=provider.name, title=title)
     _executor_for(provider.name).submit(_run, job_id, url, fmt, provider)
     return job_id
 
@@ -228,4 +228,6 @@ def _run(job_id: str, url: str, fmt: str | None, provider: Provider) -> None:
 def _fail(job_id: str, url: str, platform: str, message: str) -> None:
     job = get(job_id)
     _update(job_id, status="error", error=message, speed=None, eta=None)
-    db.add_history(url, platform, job.title if job else None, "error", None)
+    # The reason is stored, so history can explain a failure long after the
+    # queue that showed it has gone.
+    db.add_history(url, platform, job.title if job else None, "error", None, message)

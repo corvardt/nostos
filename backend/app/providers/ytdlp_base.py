@@ -30,6 +30,17 @@ _AUTH_HINTS = (
     "sign in",
     "private",
     "cookies",
+    "only works when logged-in",
+)
+
+# Signs that the site changed and the extractor has not caught up yet. Nothing
+# the user can configure fixes these; an updated yt-dlp usually does.
+_STALE_EXTRACTOR_HINTS = (
+    "oauth token",
+    "unable to fetch new oauth",
+    "unable to extract",
+    "failed to parse json",
+    "no video formats found",
 )
 
 # Standard ladder, filtered down to the heights the media actually offers.
@@ -283,10 +294,25 @@ class YtDlpProvider(Provider):
 
     # ----------------------------------------------------------------- errors
 
+    def _site(self, message: str) -> str:
+        """yt-dlp prefixes errors with the extractor, e.g. "[vimeo] 123: ...".
+
+        For the generic provider that prefix is the only thing naming the site.
+        """
+        match = re.match(r"\[([\w:.-]+)\]", message)
+        return match.group(1).split(":")[0].capitalize() if match else self.name
+
     def _translate(self, exc: Exception) -> ProviderError:
         """Turn a yt-dlp stack trace into something the UI can show a human."""
         message = str(exc).replace("ERROR: ", "").strip()
         lowered = message.lower()
+
+        if any(hint in lowered for hint in _STALE_EXTRACTOR_HINTS):
+            return ProviderError(
+                f"{self._site(message)} could not be read. The site has probably changed and "
+                "yt-dlp needs updating: run `pip install -U yt-dlp` in backend/.venv and try "
+                f"again. ({message})"
+            )
         if self.use_cookies and any(hint in lowered for hint in _AUTH_HINTS):
             browser = config.cookies_from_browser()
             if browser:

@@ -7,9 +7,11 @@ const BROWSERS = ["", "firefox", "chrome", "chromium", "brave", "edge", "opera",
 interface Props {
   settings: Settings;
   onSaved: (settings: Settings) => void;
+  onHistoryCleared: () => void;
 }
 
-export default function SettingsPanel({ settings, onSaved }: Props) {
+export default function SettingsPanel({ settings, onSaved, onHistoryCleared }: Props) {
+  const [confirmingClear, setConfirmingClear] = useState(false);
   const [draft, setDraft] = useState<Settings>(settings);
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -24,6 +26,18 @@ export default function SettingsPanel({ settings, onSaved }: Props) {
       setNote(err instanceof Error ? err.message : "Settings did not save.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function clearHistory() {
+    try {
+      const { cleared } = await api.clearHistory();
+      setNote(`Cleared ${cleared} ${cleared === 1 ? "entry" : "entries"}`);
+      onHistoryCleared();
+    } catch (err) {
+      setNote(err instanceof Error ? err.message : "History did not clear.");
+    } finally {
+      setConfirmingClear(false);
     }
   }
 
@@ -96,6 +110,23 @@ export default function SettingsPanel({ settings, onSaved }: Props) {
           <p className="field-help">
             Every download is recorded here, in the <code>history</code> table.
           </p>
+          <div className="settings-foot">
+            {confirmingClear ? (
+              <>
+                <button className="btn btn-danger" onClick={clearHistory}>
+                  Clear it, permanently
+                </button>
+                <button className="link" onClick={() => setConfirmingClear(false)}>
+                  Keep it
+                </button>
+              </>
+            ) : (
+              <button className="btn" onClick={() => setConfirmingClear(true)}>
+                Clear history
+              </button>
+            )}
+            <span className="field-help">Downloaded files are not deleted.</span>
+          </div>
         </div>
       )}
 

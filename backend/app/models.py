@@ -28,6 +28,8 @@ class MediaInfo(BaseModel):
     duration: float | None = None
     is_image: bool = False
     is_live: bool = False
+    # Set when this exact URL was already downloaded and the file is still there.
+    already_downloaded: str | None = None
     webpage_url: str | None = None
     formats: list[Format] = Field(default_factory=list)
 
@@ -62,6 +64,8 @@ class Playlist(BaseModel):
 class BatchDownloadRequest(BaseModel):
     urls: list[str]
     format: str | None = "best"
+    # Re-running a playlist should not refetch what is already on disk.
+    skip_duplicates: bool = True
 
 
 class BatchItem(BaseModel):
@@ -70,17 +74,22 @@ class BatchItem(BaseModel):
     url: str
     jobId: str | None = None  # noqa: N815 - matches DownloadResponse
     error: str | None = None
+    # Not queued because it is already on disk, which is not a failure.
+    skipped: bool = False
 
 
 class BatchResponse(BaseModel):
     accepted: int
     rejected: int
+    skipped: int = 0
     items: list[BatchItem]
 
 
 class Job(BaseModel):
     id: str
     url: str
+    # Kept so a failed or stopped job can be retried exactly as it was asked for.
+    format: str | None = None
     platform: str | None = None
     title: str | None = None
     status: JobStatus = "queued"
@@ -100,6 +109,7 @@ class HistoryEntry(BaseModel):
     title: str | None = None
     status: str
     filepath: str | None = None
+    error: str | None = None
     created_at: str
 
 

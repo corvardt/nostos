@@ -19,6 +19,8 @@ export interface MediaInfo {
   duration: number | null;
   is_image: boolean;
   is_live: boolean;
+  /** Set when this URL was already downloaded and the file is still present. */
+  already_downloaded: string | null;
   webpage_url: string | null;
   formats: Format[];
 }
@@ -26,6 +28,8 @@ export interface MediaInfo {
 export interface Job {
   id: string;
   url: string;
+  /** Kept so a failed or stopped job can be retried as first asked for. */
+  format: string | null;
   platform: string | null;
   title: string | null;
   status: JobStatus;
@@ -55,11 +59,13 @@ export interface BatchItem {
   url: string;
   jobId: string | null;
   error: string | null;
+  skipped: boolean;
 }
 
 export interface BatchResponse {
   accepted: number;
   rejected: number;
+  skipped: number;
   items: BatchItem[];
 }
 
@@ -70,6 +76,7 @@ export interface HistoryEntry {
   title: string | null;
   status: string;
   filepath: string | null;
+  error: string | null;
   created_at: string;
 }
 

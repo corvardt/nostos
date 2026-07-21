@@ -37,9 +37,14 @@ async def analyze(req: AnalyzeRequest) -> MediaInfo:
 
     try:
         # Metadata extraction is blocking network I/O - keep it off the event loop.
-        return await anyio.to_thread.run_sync(provider.resolve, req.url)
+        media = await anyio.to_thread.run_sync(provider.resolve, req.url)
     except ProviderError as exc:
         raise HTTPException(status_code=422 if exc.needs_auth else 400, detail=exc.message) from exc
+
+    previous = db.last_successful_download(req.url.strip())
+    if previous:
+        media.already_downloaded = previous["created_at"]
+    return media
 
 
 @router.post("/download", response_model=DownloadResponse)
@@ -108,6 +113,19 @@ async def download_batch(req: BatchDownloadRequest) -> BatchResponse:
         if not url or url in seen:
             continue
         seen.add(url)
+
+        if req.skip_duplicates:
+            previous = db.last_successful_download(url)
+            if previous:
+                items.append(
+                    BatchItem(
+                        url=url,
+                        skipped=True,
+                        error=f"Already downloaded on {previous['created_at']}.",
+                    )
+                )
+                continue
+
         try:
             provider = resolve_provider(url)
         except ProviderError as exc:
@@ -116,7 +134,13 @@ async def download_batch(req: BatchDownloadRequest) -> BatchResponse:
         items.append(BatchItem(url=url, jobId=jobs.start(url, req.format, provider)))
 
     accepted = sum(1 for i in items if i.jobId)
-    return BatchResponse(accepted=accepted, rejected=len(items) - accepted, items=items)
+    skipped = sum(1 for i in items if i.skipped)
+    return BatchResponse(
+        accepted=accepted,
+        rejected=len(items) - accepted - skipped,
+        skipped=skipped,
+        items=items,
+    )
 
 
 @router.get("/jobs/{job_id}", response_model=Job)
@@ -125,6 +149,26 @@ async def get_job(job_id: str) -> Job:
     if job is None:
         raise HTTPException(status_code=404, detail="Unknown job id.")
     return job
+
+
+@router.post("/jobs/{job_id}/retry", response_model=DownloadResponse)
+async def retry_job(job_id: str) -> DownloadResponse:
+    """Queue a failed or stopped job again, at the quality first asked for."""
+    job = jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Unknown job id.")
+    if job.status not in ("error", "cancelled"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"That download is {job.status}, so there is nothing to retry.",
+        )
+
+    try:
+        provider = resolve_provider(job.url)
+    except ProviderError as exc:
+        raise HTTPException(status_code=400, detail=exc.message) from exc
+
+    return DownloadResponse(status="started", jobId=jobs.start(job.url, job.format, provider))
 
 
 @router.delete("/jobs/{job_id}")
@@ -143,6 +187,12 @@ async def cancel_all_jobs() -> dict[str, int]:
 @router.get("/history", response_model=list[HistoryEntry])
 async def history(limit: int = 50) -> list[HistoryEntry]:
     return [HistoryEntry(**row) for row in db.list_history(limit)]
+
+
+@router.delete("/history")
+async def clear_history() -> dict[str, int]:
+    """Empty the download log. Files already on disk are not touched."""
+    return {"cleared": db.clear_history()}
 
 
 @router.get("/settings", response_model=Settings)
