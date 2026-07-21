@@ -12,9 +12,9 @@ _HTTP_RE = re.compile(r"^https?://\S+$", re.IGNORECASE)
 class GenericProvider(YtDlpProvider):
     """Anything yt-dlp can handle that no dedicated provider claimed.
 
-    yt-dlp ships over 1700 extractors. Registered last, this hands them every
-    URL the specific providers passed over, so TikTok, X, Reddit, Vimeo,
-    SoundCloud, Twitch and the rest work without a class each.
+    Registered last, this hands yt-dlp every URL the specific providers passed
+    over. Whether any given site works is up to yt-dlp and how recently that
+    site changed, so this is a best effort rather than a supported list.
 
     Cookies are offered because many of those sites gate content the same way
     Instagram does; they are only sent if a browser is configured in Settings.

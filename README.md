@@ -2,61 +2,55 @@
 
 *(n.) the homecoming: the return journey that ends where you belong.*
 
-A local media downloader for YouTube, Instagram and Threads. Paste a link, see a preview, get the
-original file. Everything runs on your own machine: no account, no server, no external service.
+Paste a link, see what it is, get the file. Nostos runs entirely on your own machine: no account,
+no server, nothing sent anywhere except to the site you are downloading from.
+
+## What works
+
+| Platform | How | Login needed |
+|---|---|---|
+| YouTube | yt-dlp | no |
+| Instagram | yt-dlp | usually not for public Reels |
+| Threads | its own scraper, since yt-dlp has no Threads extractor | **always** |
+| Anything else | passed to yt-dlp's extractors | depends |
+
+The first three are the ones actually built and tested here. Everything else falls through to
+yt-dlp, which supports a great many sites, but whether any given one works depends on yt-dlp and
+on how recently that site changed. SoundCloud and direct media links work; Vimeo, at the time of
+writing, does not. Treat the fallback as "worth a try", not a promise.
 
 ## Features
 
-- **Over 1700 sites.** YouTube, Instagram and Threads have dedicated handling; everything else
-  yt-dlp supports (TikTok, X, Reddit, Vimeo, SoundCloud, Twitch and the rest) is picked up by a
-  generic fallback.
-- **Preview before you commit.** Title, author, thumbnail, duration and the qualities on offer.
-- **Batch downloads.** Paste any number of links at once and queue them together.
-- **Playlist expansion.** Paste a playlist and it lists its items, up to 200, in a couple of
-  seconds without fetching a single video.
-- **One quality for a whole queue**, chosen as a cap so mixed items each get their best.
-- **Paste to download**, optional: one paste analyzes and fetches at top quality, no clicks.
-- **Live transfer readout** with progress, speed, bytes moved and time remaining.
-- **Stop anything mid-flight**, one item or the whole queue, and the partial files are cleaned up.
-- **Tagged files.** Title, artist, date, source URL, chapters and cover art are embedded into
-  every download. Subtitles too, if you name the languages.
-- **Retry** anything that failed or was stopped, at the quality first asked for.
-- **Skips what you already have.** Re-run a playlist and it only fetches the new items.
-- **History** of everything downloaded, with the reason for any failure. Clearable from
-  Settings, which never touches the files themselves.
-- **Polite by default.** Downloads are paced per platform, and live broadcasts are refused
-  rather than left running forever.
+- Preview before downloading: title, author, thumbnail, duration, available qualities
+- Queue many links at once, or expand a playlist and queue that
+- One quality for a whole queue, chosen as a cap ("up to 1080p")
+- Optional paste-to-download: one paste, no clicks
+- Stop or retry anything, individually or all at once
+- Title, artist, date, source URL, chapters and cover art embedded in every file
+- Optional subtitles
+- Skips what you have already downloaded
+- A history of everything, with the reason for any failure
 
----
+## Before you run it
 
-## ⚠️ Read this before running it
+**No authentication. Keep it on localhost.** Anyone who can reach the port can make your machine
+download files and read your history. Do not bind it to `0.0.0.0` or put it on a public host. To
+reach it from elsewhere, put a tunnel with access control in front, such as Cloudflare Tunnel
+with Cloudflare Access.
 
-**Nostos has no authentication and is meant for `localhost` only.** Anyone who can reach the
-backend port can make your machine download files and can read your download history. Do not
-bind it to `0.0.0.0`, do not port-forward it, and do not put it on a public host. If you want it
-on another device, put it behind a tunnel with access control (for example Cloudflare Tunnel plus
-Cloudflare Access) rather than exposing the port.
+**It reads your browser's cookies, narrowly.** Instagram and Threads need a logged-in session, so
+Nostos reads cookies from a browser you pick in Settings. It does not hand your profile to
+yt-dlp: the jar is filtered to the domain being contacted, written to a private file (`0600`,
+inside `~/.local/share/nostos/cookies`) that exists only for that one request and is deleted
+afterwards, including on failure. On a real profile of 790 cookies, 8 reached an Instagram
+download. They still grant access to your accounts, so only run this on a machine you trust.
 
-**It reuses your browser's cookies, narrowly.** To reach Instagram and Threads, Nostos reads the
-session cookies of a browser you select in Settings. It does not hand your browser profile to
-yt-dlp: the jar is filtered to the domains being contacted, so an Instagram download carries
-Instagram cookies and nothing else. Roughly 1% of a real profile reaches any single request.
-
-The scoped cookies are written to a private file (mode `0600`, unpredictable name, under
-`~/.local/share/nostos/cookies`) that exists only for the duration of that one call and is
-deleted afterwards, including when the download fails. Cookie values are never logged. They still
-grant access to your logged-in accounts, so only run this on a machine you trust.
-
-**Download only what you have the right to.** This tool is for retrieving your own uploads or
-content you are permitted to save. Respect each platform's terms of service and local copyright
-law. You are responsible for how you use it.
-
----
+**Download only what you have the right to.** Respect each site's terms and your local copyright
+law. You are responsible for how you use this.
 
 ## Quick start
 
-Requires **Python 3.11+**, **Node 18+**, and **ffmpeg** (used to mux separate video and audio
-streams).
+Needs **Python 3.11+**, **Node 18+** and **ffmpeg**.
 
 ```bash
 git clone https://github.com/corvardt/nostos.git
@@ -64,8 +58,7 @@ cd nostos
 ./run.sh
 ```
 
-Then open <http://localhost:5173>. On first run the script creates the Python virtualenv and
-installs npm dependencies.
+Open <http://localhost:5173>. The first run creates the virtualenv and installs npm packages.
 
 | | |
 |---|---|
@@ -74,86 +67,44 @@ installs npm dependencies.
 | Downloads | `~/Downloads/Nostos` |
 | Database | `~/.local/share/nostos/nostos.db` |
 
-Set `NOSTOS_DATA_DIR` to move the database somewhere else.
+Set `NOSTOS_DATA_DIR` to keep the database somewhere else.
 
-### Using it
+## Using it
 
-1. Paste a link and press **Analyze** to see the title, author, thumbnail and available qualities.
-2. Pick a quality and press **Download**. Progress is reported live; the file lands in your
-   download folder.
-3. Turn on **Download on paste** in Settings to skip both clicks. Pasting a link then analyzes
-   and downloads it at the highest quality automatically.
+Paste a link, press **Analyze**, pick a quality, press **Download**.
 
-### Batches and playlists
+Paste several links, or a playlist URL, and you get a confirm step with the count and one quality
+for the whole queue. That step is always shown, so a stray paste never starts downloads by
+itself. Playlists are listed without fetching any videos, up to 200 items.
 
-Paste several links at once, separated by anything, and Nostos offers to queue them together.
-Paste a playlist URL and it expands to its items first, listing up to 200.
+While a queue runs, finished items clear themselves after a few seconds. What stays on screen is
+what still needs you: failed and stopped downloads, each with a **Retry**. **Clear** empties the
+queue and stops anything running.
 
-Both show a confirm step with the count before anything is queued, so a stray paste can never
-start downloads on its own, even with paste-to-download enabled. Pick one quality for the whole
-queue there. The options are height *caps*, hence "up to 1080p": a queue's items rarely share a
-format ladder, so each one gets the best it has at or below the cap.
+Downloads are paced per site: three at a time for YouTube, one at a time for Instagram and
+Threads, which throttle bursts. Live broadcasts are refused, because they never finish.
 
-While a queue runs, a single download keeps the full transfer readout and several switch to
-compact rows. Completed items retire themselves a few seconds after finishing, so what stays on
-screen is exactly what still needs a decision: the failed and stopped ones, each with a Retry
-button. `Clear` empties the queue outright, stopping anything still running.
+## When something breaks
 
-Queue rows are named from the moment they are queued: a playlist expansion already knows every
-title, so it is sent along and nothing waits for a download to start before it can identify
-itself. It also means a failure records a title in history rather than a bare URL.
+**A site suddenly stops working.** Usually the site changed and yt-dlp has caught up since:
 
-Re-queueing a URL already downloaded is skipped when the file is still on disk, so re-running a
-playlist only fetches what is new. Analyze says so too, before you click.
-
-Downloads are paced per platform: YouTube runs three at a time, Instagram and Threads one at a
-time with a short gap, because they throttle bursts.
-
-Anything still queued or running can be stopped, individually or all at once. A cancelled
-download takes its scratch files with it (`.part`, fragments, orphaned cover art), since there is
-no resume to use them for.
-
-**Live broadcasts are refused.** They download in real time and never finish, so a single live
-item in a playlist would hold a worker open indefinitely. Analyze flags them before you click.
-
-## Platform notes
-
-Open **Settings** and pick the browser you are signed in with; Nostos reuses that browser's
-cookies. On Linux this needs the `secretstorage` package (already in `requirements.txt`) to
-decrypt Chromium-family cookie stores via the OS keyring. Firefox does not need it.
-
-| Platform | Engine | Login needed |
-|---|---|---|
-| YouTube | yt-dlp | no |
-| Instagram | yt-dlp | usually not for public Reels |
-| Threads | dedicated scraper | **yes, always** |
-| Everything else | yt-dlp generic fallback | depends on the site |
-
-Anything the three dedicated providers do not claim goes to the fallback, which hands it to
-yt-dlp's full extractor set. Cookies are offered there too, so gated sites work the same way.
-
-**Threads has no yt-dlp extractor.** Every Threads URL falls through to yt-dlp's `generic`
-extractor, which finds nothing, so `providers/threads.py` implements the Provider contract
-directly. Two things make it work:
-
-- A logged-in `sessionid` cookie. Anonymous requests get a ~256 KB empty app shell with no post
-  data at all; the same URL with a session returns ~720 KB including the payload.
-- Browser-like `Sec-Fetch-*` navigation headers. Without them the server serves the empty shell
-  even *with* valid cookies.
-
-Media URLs are parsed from the inlined JSON (`video_versions`, `image_versions2`) and fetched
-straight from the CDN, so no ffmpeg is needed: they arrive already muxed.
-
-If Threads stops working, your session most likely expired: sign in again in that browser. The
-error messages distinguish "no browser configured", "no login found", and "session expired".
-
-## Architecture
-
-```
-URL -> Provider Resolver -> MediaInfo -> Download Manager -> file + history
+```bash
+backend/.venv/bin/pip install -U yt-dlp
 ```
 
-Every platform implements one interface (`backend/app/providers/base.py`):
+**Threads says you are not signed in.** Sessions expire. Sign in again in the browser you picked
+in Settings.
+
+**Instagram or Threads cookies cannot be read on Linux.** Chromium-family browsers need the
+`secretstorage` package (already a dependency) and an unlocked keyring. Firefox needs neither.
+
+## How it is built
+
+```
+URL -> provider resolver -> media info -> download manager -> file + history
+```
+
+Each platform implements one interface (`backend/app/providers/base.py`):
 
 ```python
 class Provider(ABC):
@@ -162,53 +113,49 @@ class Provider(ABC):
     def download(self, url, fmt=None, on_progress=None) -> str: ...
 ```
 
-`YtDlpProvider` implements resolve/download once on top of yt-dlp; `youtube.py` and
-`instagram.py` supply only a URL pattern and options. `threads.py` implements the interface
-directly. `registry.py` maps a URL to the first provider that claims it.
+`YtDlpProvider` implements it once over yt-dlp, and YouTube and Instagram supply little more than
+a URL pattern. Threads implements the interface directly, because yt-dlp has no Threads
+extractor: an anonymous request gets an empty page, so it needs a session cookie and browser-like
+`Sec-Fetch-*` headers, then reads the media URLs out of the JSON inlined in the page.
 
-Downloads run on a thread pool (`jobs.py`) because yt-dlp blocks; the UI polls `GET /jobs/{id}`.
-Completed and failed jobs are written to SQLite (`db.py`).
+Downloads run on a thread pool, since yt-dlp blocks. The UI polls `GET /jobs/{id}`.
 
 ### API
 
-| Method | Path | Purpose |
+| Method | Path | |
 |---|---|---|
-| POST | `/analyze` | `{url}` → `MediaInfo` |
-| POST | `/download` | `{url, format}` → `{status, jobId}` |
+| POST | `/analyze` | `{url}` to media info |
+| POST | `/download` | `{url, format}` to a job id |
+| POST | `/download/batch` | many URLs, with a reason for any skipped |
+| POST | `/expand` | a playlist's items |
 | GET | `/jobs/{id}` | progress and final path |
-| GET | `/history` | recent downloads |
-| DELETE | `/jobs/{id}` | stop one download |
 | POST | `/jobs/{id}/retry` | queue a failed or stopped job again |
-| DELETE | `/jobs` | stop everything queued or running |
-| DELETE | `/history` | empty the log, leaving files alone |
-| GET/PUT | `/settings` | download folder, browser, paste behaviour, subtitles |
+| DELETE | `/jobs/{id}`, `/jobs` | stop one, or everything |
+| GET/DELETE | `/history` | list, or empty it |
+| GET/PUT | `/settings` | |
 
 ## Development
 
 ```bash
 cd backend
-.venv/bin/pip install -r requirements-dev.txt   # test tooling, once
-.venv/bin/pytest                                # 94 tests, no network
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest
 
-cd ../frontend && npm run build                 # typecheck + bundle
+cd ../frontend && npm run build
 ```
 
-Nothing in the suite touches a real site: providers are faked and page payloads come from
-fixtures, so the tests are fast and work offline.
+The tests never touch a real site: providers are faked and page payloads come from fixtures.
 
-The frontend is plain React + TypeScript + Vite, which is exactly what a Tauri desktop shell
-would wrap. All backend calls live in `frontend/src/lib/api.ts`, and no component calls `fetch`
-directly, so swapping HTTP for Tauri commands is a one-file change.
+The frontend is plain React, TypeScript and Vite, which is what a Tauri shell would wrap. Every
+backend call lives in `frontend/src/lib/api.ts` and no component calls `fetch`, so swapping the
+transport is a one-file change.
 
-### Extending
-
-- **New platform**: subclass `YtDlpProvider` with a URL pattern, register it in
-  `providers/registry.py`. Nothing else changes.
-- **Persistent or queued jobs**: `jobs.py` holds the whole registry behind `start()`/`get()`.
+To add a site with its own handling, subclass `YtDlpProvider` with a URL pattern and register it
+in `providers/registry.py`. Nothing else changes.
 
 ## Not implemented
 
-Tauri desktop packaging, multiple accounts per platform, cloud sync, mobile sync, sharing.
+Desktop packaging, multiple accounts per site, cloud or mobile sync, sharing.
 
 ## License
 
