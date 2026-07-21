@@ -8,9 +8,15 @@ import SettingsPanel from "./components/SettingsPanel";
 import * as api from "./lib/api";
 import type { HistoryEntry, Job, MediaInfo, Settings } from "./lib/types";
 import { extractUrls, looksLikePlaylist } from "./lib/urls";
+import { BATCH_QUALITIES } from "./lib/quality";
 import markUrl from "../assets/down.png";
 
 const POLL_MS = 500;
+
+// How long a finished queue stays on screen before clearing itself, and how
+// long the fade runs before it goes.
+const CLEAR_MS = 8000;
+const FADE_MS = 500;
 
 /** A confirmed-before-queueing set of links: a paste of many, or a playlist. */
 interface Pending {
@@ -42,6 +48,8 @@ export default function App() {
   const [format, setFormat] = useState("best");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [pending, setPending] = useState<Pending | null>(null);
+  const [batchFormat, setBatchFormat] = useState("best");
+  const [fading, setFading] = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -81,6 +89,25 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [activeKey, refreshHistory]);
 
+  // A queue that finished cleanly clears itself, so the panel does not linger
+  // over the next paste. Anything that failed stays put: the error text lives
+  // only here, since history records the status but not the reason.
+  useEffect(() => {
+    if (jobs.length === 0) return;
+    const settled = jobs.every((j) => j.status === "done" || j.status === "error");
+    if (!settled || jobs.some((j) => j.status === "error")) return;
+
+    const fade = window.setTimeout(() => setFading(true), CLEAR_MS - FADE_MS);
+    const clear = window.setTimeout(() => {
+      setJobs([]);
+      setFading(false);
+    }, CLEAR_MS);
+    return () => {
+      window.clearTimeout(fade);
+      window.clearTimeout(clear);
+    };
+  }, [jobs]);
+
   function reportError(err: unknown) {
     const needsAuth = err instanceof api.ApiError && err.needsAuth;
     setError({ message: err instanceof Error ? err.message : "Something went wrong.", needsAuth });
@@ -109,20 +136,22 @@ export default function App() {
     setError(null);
     try {
       const { jobId } = await api.download(raw, fmt);
+      setFading(false);
       setJobs((prev) => [blankJob(jobId, raw, media ?? info), ...prev]);
     } catch (err) {
       reportError(err);
     }
   }
 
-  async function runBatch(urls: string[]) {
+  async function runBatch(urls: string[], fmt: string) {
     setError(null);
     setInfo(null);
     try {
-      const result = await api.downloadBatch(urls, "best");
+      const result = await api.downloadBatch(urls, fmt);
       const started = result.items
         .filter((i) => i.jobId)
         .map((i) => blankJob(i.jobId!, i.url));
+      setFading(false);
       setJobs((prev) => [...started, ...prev]);
       setPending(null);
       setUrl("");
@@ -266,11 +295,21 @@ export default function App() {
                 <p className="batch-sub">Only the first {pending.urls.length} will be queued.</p>
               )}
             </div>
+
+            <FormatPicker
+              formats={BATCH_QUALITIES}
+              value={batchFormat}
+              onChange={setBatchFormat}
+            />
+
             <div className="batch-actions">
               <button className="btn" onClick={() => setPending(null)}>
                 Cancel
               </button>
-              <button className="btn btn-primary" onClick={() => runBatch(pending.urls)}>
+              <button
+                className="btn btn-primary"
+                onClick={() => runBatch(pending.urls, batchFormat)}
+              >
                 Download all
               </button>
             </div>
@@ -313,7 +352,11 @@ export default function App() {
         )}
 
         {/* One download keeps the full instrument readout; a queue gets rows. */}
-        {singleJob ? <JobProgress job={singleJob} /> : jobs.length > 1 && <QueueList jobs={jobs} />}
+        {jobs.length > 0 && (
+          <div className={fading ? "settling" : undefined}>
+            {singleJob ? <JobProgress job={singleJob} /> : <QueueList jobs={jobs} />}
+          </div>
+        )}
       </div>
 
       <section className="ledger">

@@ -57,14 +57,26 @@ Set `NOSTOS_DATA_DIR` to move the database somewhere else.
 3. Turn on **Download on paste** in Settings to skip both clicks. Pasting a link then analyzes
    and downloads it at the highest quality automatically.
 
-**Batch:** paste several links at once (any separator) and Nostos offers to queue them all.
-**Playlists:** paste a playlist URL and it expands to its items first. Both show a confirm step
-with the count before anything is queued, so a stray paste can never start downloads on its own,
-even with paste-to-download enabled.
+### Batches and playlists
+
+Paste several links at once, separated by anything, and Nostos offers to queue them together.
+Paste a playlist URL and it expands to its items first, listing up to 200.
+
+Both show a confirm step with the count before anything is queued, so a stray paste can never
+start downloads on its own, even with paste-to-download enabled. Pick one quality for the whole
+queue there. The options are height *caps*, hence "up to 1080p": a queue's items rarely share a
+format ladder, so each one gets the best it has at or below the cap.
+
+While a queue runs, a single download keeps the full transfer readout and several switch to
+compact rows with a running tally. A queue that finishes cleanly clears itself after a few
+seconds; if anything failed it stays put, because the reason is shown there and history records
+only the status.
 
 Downloads are paced per platform: YouTube runs three at a time, Instagram and Threads one at a
-time with a short gap, because they throttle bursts. Live broadcasts are refused, since they
-never finish and would hold a worker open indefinitely.
+time with a short gap, because they throttle bursts.
+
+**Live broadcasts are refused.** They download in real time and never finish, so a single live
+item in a playlist would hold a worker open indefinitely. Analyze flags them before you click.
 
 ## Platform notes
 
