@@ -279,8 +279,16 @@ cd backend
 ```
 
 `scripts/build-package.sh` compiles `frontend/` into `backend/nostos/static/` and copies this file
-to `backend/README.md` for the PyPI page. Both are gitignored and generated at release time. `scripts/install.sh` is what end users pipe into `sh`; it only needs
-updating if the install story changes. With it present, `nostos` serves the whole application from one port;
+to `backend/README.md` for the PyPI page. Both are gitignored and generated at release time.
+
+Releases are published by `.github/workflows/publish.yml`. Publishing a GitHub release goes to
+PyPI; running the workflow by hand goes to TestPyPI, or builds and checks without publishing.
+Neither can ship an artifact with no interface in it — a guard opens the wheel and the sdist and
+fails the run if `static/index.html` is not there, because that mistake installs cleanly, serves a
+503 where the page should be, and cannot be fixed by re-uploading the same version.
+
+`scripts/install.sh` is what end users pipe into `sh`; it only needs updating if the install story
+changes. With it present, `nostos` serves the whole application from one port;
 without it, the API runs and the root path says what to do about it. The UI tests skip themselves
 when nothing is built, so a fresh checkout still passes.
 

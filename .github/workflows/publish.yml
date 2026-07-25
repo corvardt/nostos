@@ -4,14 +4,25 @@
 # against a publisher configured on the project (owner corvardt, repo nostos,
 # workflow publish.yml, environment pypi). Set that up once at
 # https://pypi.org/manage/account/publishing/ before the first release.
+#
+# Publishing a GitHub release goes to PyPI. Running this by hand goes to
+# TestPyPI, or builds and checks without publishing at all - a rehearsal is
+# worth the habit here, because a version number on PyPI can never be reused.
 
 name: publish
 
 on:
   release:
     types: [published]
-  # Building on demand is useful for rehearsing a release without publishing.
   workflow_dispatch:
+    inputs:
+      target:
+        description: Where a manual run should publish
+        type: choice
+        default: testpypi
+        options:
+          - testpypi
+          - build-only
 
 permissions:
   contents: read
@@ -82,9 +93,11 @@ jobs:
 
   publish:
     needs: [build, test]
+    if: github.event_name == 'release' || inputs.target == 'testpypi'
     runs-on: ubuntu-latest
     # A protected environment means a release cannot be published by a
-    # workflow run that was not meant to.
+    # workflow run that was not meant to. The name matches the publisher
+    # registered on both PyPI and TestPyPI.
     environment: pypi
     permissions:
       id-token: write # the OIDC token that replaces an API token
@@ -93,4 +106,13 @@ jobs:
         with:
           name: dist
           path: dist/
-      - uses: pypa/gh-action-pypi-publish@release/v1
+
+      - name: Publish to TestPyPI
+        if: github.event_name == 'workflow_dispatch'
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+
+      - name: Publish to PyPI
+        if: github.event_name == 'release'
+        uses: pypa/gh-action-pypi-publish@release/v1
