@@ -14,12 +14,34 @@
 # POSIX sh on purpose: this has to run before we have installed anything.
 set -eu
 
-# The distribution is nostos-app; the command it installs is `nostos`.
-PACKAGE="${NOSTOS_PACKAGE:-nostos-app}"
+REPO="${NOSTOS_REPO:-corvardt/nostos}"
+
+# Set NOSTOS_PACKAGE to install something else - a local wheel while testing,
+# or a specific release. Empty means "whatever the latest release ships".
+PACKAGE="${NOSTOS_PACKAGE:-}"
 
 say()  { printf '%s\n' "$*"; }
 warn() { printf '%s\n' "$*" >&2; }
 die()  { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+fetch() {
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsSL "$1"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -qO- "$1"
+  else
+    die "Neither curl nor wget is available."
+  fi
+}
+
+# The wheel is a GitHub release asset rather than a package on an index, so the
+# URL has to be looked up: its filename carries the version. Unauthenticated
+# API calls are rate-limited per address, which is fine for one install.
+latest_wheel() {
+  fetch "https://api.github.com/repos/$REPO/releases/latest" \
+    | grep -o "https://[^\"]*\.whl" \
+    | head -n 1
+}
 
 # ---------------------------------------------------------------------- uv
 #
@@ -48,7 +70,13 @@ fi
 
 # ------------------------------------------------------------------- nostos
 
-say "Installing $PACKAGE…"
+if [ -z "$PACKAGE" ]; then
+  say "Looking up the latest release…"
+  PACKAGE="$(latest_wheel || true)"
+  [ -n "$PACKAGE" ] || die "No release wheel found for $REPO. Has a release been published?"
+fi
+
+say "Installing ${PACKAGE##*/}…"
 uv tool install --force "$PACKAGE"
 
 if ! command -v nostos >/dev/null 2>&1; then

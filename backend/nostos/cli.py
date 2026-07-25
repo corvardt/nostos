@@ -23,9 +23,10 @@ from . import config, media, pidfile
 DEFAULT_PORT = 8000
 HOST = "127.0.0.1"
 
-# What this is called on PyPI, which is not what it is called anywhere else:
-# plain `nostos` belongs to an unrelated project. Only metadata lookups and the
-# install line use this; the import package and the command are both `nostos`.
+# The distribution name, which is not what this is called anywhere else: plain
+# `nostos` is taken by an unrelated project, and the suffix keeps the two from
+# colliding in one environment. Only the metadata lookup below uses it; the
+# import package and the command are both `nostos`.
 DISTRIBUTION = "nostos-app"
 
 LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
