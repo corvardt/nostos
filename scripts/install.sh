@@ -79,9 +79,31 @@ fi
 say "Installing ${PACKAGE##*/}…"
 uv tool install --force "$PACKAGE"
 
+# `uv tool install` puts the command in uv's tool bin directory, which is on the
+# PATH of future shells only - the same gap uv's own installer leaves. Without
+# this, a first install on a machine where that directory is not yet on PATH
+# stopped here: the ffmpeg step never ran and the one line in the readme left a
+# half-finished install behind. Prepend it for the rest of this script, and say
+# so at the end rather than in place of the remaining work.
+TOOL_BIN="$(uv tool dir --bin 2>/dev/null || true)"
+if [ -z "$TOOL_BIN" ]; then
+  # Older uv has no `--bin`. These are the same defaults it would have printed.
+  TOOL_BIN="${UV_TOOL_BIN_DIR:-${XDG_BIN_HOME:-$HOME/.local/bin}}"
+fi
+
+SHELL_NEEDS_UPDATING=""
+case ":$PATH:" in
+  *":$TOOL_BIN:"*) ;;
+  *)
+    PATH="$TOOL_BIN:$PATH"
+    export PATH
+    SHELL_NEEDS_UPDATING=1
+    ;;
+esac
+
 if ! command -v nostos >/dev/null 2>&1; then
   warn ""
-  warn "nostos is installed but not yet on your PATH."
+  warn "nostos was installed but is not in $TOOL_BIN."
   warn "Run:  uv tool update-shell"
   warn "then open a new terminal."
   warn ""
@@ -105,5 +127,12 @@ say "Done. Start it with:"
 say ""
 say "    nostos"
 say ""
+if [ -n "$SHELL_NEEDS_UPDATING" ]; then
+  say "In a new terminal that needs one more step, because $TOOL_BIN is not on"
+  say "your PATH yet:"
+  say ""
+  say "    uv tool update-shell"
+  say ""
+fi
 say "That opens the interface in your browser. 'nostos doctor' says what is"
 say "installed and where things live; 'nostos stop' shuts it down."
