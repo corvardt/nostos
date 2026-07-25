@@ -125,11 +125,19 @@ script installs [uv](https://docs.astral.sh/uv/) — one static binary, which
 brings its own Python — then Nostos, then ffmpeg if you do not already have it.
 `nostos` starts the server and opens the interface.
 
-Already have a Python you like? `uv tool install nostos-app`, or `pipx install
-nostos-app`, does the same thing without the script.
+Already have a Python you like? Install the wheel from the latest release
+directly, which is all the script does:
 
-The distribution is called **nostos-app** because plain `nostos` on PyPI belongs
-to an unrelated project. The command it installs is `nostos`.
+```bash
+uv tool install https://github.com/corvardt/nostos/releases/latest/download/nostos_app-VERSION-py3-none-any.whl
+```
+
+Nostos is not on PyPI. An index would add resolution by name and nothing else,
+at the cost of a name that was already taken and a version number that can never
+be reused. The release asset installs exactly as well. The distribution is called
+`nostos-app`; the command it installs is `nostos`.
+
+To upgrade, run the install script again.
 
 ### Where things go
 
@@ -206,10 +214,10 @@ starting it, then **Sync and download**.
 ## When something breaks
 
 **A site suddenly stops working.** Usually the site changed and yt-dlp has caught up since.
-Upgrading re-resolves the dependencies, which pulls the current yt-dlp:
+Reinstalling re-resolves the dependencies, which pulls the current yt-dlp:
 
 ```bash
-uv tool upgrade nostos-app
+curl -fsSL https://raw.githubusercontent.com/corvardt/nostos/main/scripts/install.sh | sh
 ```
 
 **Something is wrong and you want to know what.** `nostos doctor` reports the Python and Nostos
@@ -279,13 +287,15 @@ cd backend
 ```
 
 `scripts/build-package.sh` compiles `frontend/` into `backend/nostos/static/` and copies this file
-to `backend/README.md` for the PyPI page. Both are gitignored and generated at release time.
+to `backend/README.md`, which becomes the package's own readme. Both are gitignored and
+generated at release time.
 
-Releases are published by `.github/workflows/publish.yml`. Publishing a GitHub release goes to
-PyPI; running the workflow by hand goes to TestPyPI, or builds and checks without publishing.
-Neither can ship an artifact with no interface in it — a guard opens the wheel and the sdist and
-fails the run if `static/index.html` is not there, because that mistake installs cleanly, serves a
-503 where the page should be, and cannot be fixed by re-uploading the same version.
+Releases are built by `.github/workflows/release.yml`, which attaches the wheel and sdist to the
+GitHub release. Running it by hand builds and checks without releasing. Nothing can ship an
+artifact with no interface in it: a guard opens both archives and fails the run if
+`static/index.html` is not there, because that mistake installs cleanly and then serves a 503
+where the page should be. The wheel is also installed into a fresh virtualenv and run, since a
+package that builds but does not start is not something unit tests will catch.
 
 `scripts/install.sh` is what end users pipe into `sh`; it only needs updating if the install story
 changes. With it present, `nostos` serves the whole application from one port;
