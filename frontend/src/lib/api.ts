@@ -3,7 +3,20 @@
 // Components must never call fetch() directly. When this app is wrapped in Tauri,
 // only the bodies below change (HTTP -> `invoke()`), and no component is touched.
 
-import type { BatchResponse, HistoryEntry, Job, MediaInfo, Playlist, Settings } from "./types";
+import type {
+  BatchResponse,
+  HistoryEntry,
+  Job,
+  LibraryStats,
+  LibraryTrack,
+  MediaInfo,
+  Playlist,
+  Settings,
+  SourceConfig,
+  SourceTestResult,
+  SourceType,
+  SyncReport,
+} from "./types";
 
 const BASE = "/api";
 
@@ -86,3 +99,41 @@ export const getSettings = () => request<Settings>("/settings");
 
 export const putSettings = (settings: Settings) =>
   request<Settings>("/settings", { method: "PUT", body: JSON.stringify(settings) });
+
+// --------------------------------------------------------------------- library
+
+export const getSourceTypes = () => request<SourceType[]>("/library/source-types");
+
+export const getSources = () => request<SourceConfig[]>("/library/sources");
+
+export const addSource = (source: SourceConfig) =>
+  request<SourceConfig>("/library/sources", { method: "POST", body: JSON.stringify(source) });
+
+export const updateSource = (id: number, source: SourceConfig) =>
+  request<SourceConfig>(`/library/sources/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(source),
+  });
+
+export const deleteSource = (id: number) =>
+  request<{ deleted: boolean }>(`/library/sources/${id}`, { method: "DELETE" });
+
+/** Check one source's credentials before committing to a full pass. */
+export const testSource = (id: number) =>
+  request<SourceTestResult>(`/library/sources/${id}/test`, { method: "POST" });
+
+export const runSync = (options: { dry_run?: boolean; retry_failed?: boolean; limit?: number } = {}) =>
+  request<SyncReport>("/library/sync", { method: "POST", body: JSON.stringify(options) });
+
+export const getLibraryTracks = (params: { status?: string; search?: string; limit?: number } = {}) => {
+  const query = new URLSearchParams();
+  if (params.status) query.set("status", params.status);
+  if (params.search) query.set("search", params.search);
+  query.set("limit", String(params.limit ?? 200));
+  return request<LibraryTrack[]>(`/library/tracks?${query}`);
+};
+
+export const getLibraryStats = () => request<LibraryStats>("/library/stats");
+
+export const retryFailedTracks = () =>
+  request<{ reset: number }>("/library/tracks/retry-failed", { method: "POST" });

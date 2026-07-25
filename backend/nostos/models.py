@@ -126,3 +126,16 @@ class Settings(BaseModel):
     subtitle_langs: str = ""
     # Reported so the UI can show where history lives; ignored on write.
     db_path: str = ""
+
+    # --- library sync ---
+    # Kept apart from download_dir: an archive of songs wants its own tree, not
+    # to be mixed in with one-off videos.
+    music_dir: str = ""
+    # flat | artist | artist-album
+    music_layout: str = "artist"
+    music_format: str = "mp3"
+    # Folders you already keep music in. Anything matched there is never
+    # downloaded again. One per line.
+    music_library_dirs: str = ""
+    # Ask spotdl to pick the video first, when it is installed.
+    music_use_spotdl: bool = True

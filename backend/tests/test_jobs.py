@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from app import jobs
-from app.models import Job
+from nostos import jobs
+from nostos.models import Job
 
 
 @pytest.fixture(autouse=True)

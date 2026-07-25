@@ -7,7 +7,7 @@ from http.cookiejar import Cookie
 
 import pytest
 
-from app.providers import cookies
+from nostos.providers import cookies
 
 
 def _cookie(name: str, domain: str) -> Cookie:

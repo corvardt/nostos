@@ -6,6 +6,7 @@ import anyio
 from fastapi import APIRouter, HTTPException
 
 from . import config, db, jobs
+from .library import store as library_store
 from .models import (
     AnalyzeRequest,
     BatchDownloadRequest,
@@ -204,6 +205,11 @@ async def get_settings() -> Settings:
         auto_download=db.get_setting(config.KEY_AUTO_DOWNLOAD) == "1",
         subtitle_langs=db.get_setting(config.KEY_SUBTITLE_LANGS),
         db_path=str(config.DB_PATH),
+        music_dir=db.get_setting(library_store.KEY_MUSIC_DIR),
+        music_layout=db.get_setting(library_store.KEY_MUSIC_LAYOUT),
+        music_format=db.get_setting(library_store.KEY_MUSIC_FORMAT),
+        music_library_dirs=db.get_setting(library_store.KEY_MUSIC_LIBRARY_DIRS),
+        music_use_spotdl=db.get_setting(library_store.KEY_MUSIC_USE_SPOTDL) == "1",
     )
 
 
@@ -218,10 +224,23 @@ async def put_settings(settings: Settings) -> Settings:
     db.set_setting(config.KEY_COOKIES_FROM_BROWSER, settings.cookies_from_browser)
     db.set_setting(config.KEY_AUTO_DOWNLOAD, "1" if settings.auto_download else "0")
     db.set_setting(config.KEY_SUBTITLE_LANGS, settings.subtitle_langs.strip())
+
+    if settings.music_layout not in library_store.LAYOUTS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Layout must be one of: {', '.join(library_store.LAYOUTS)}.",
+        )
+    if settings.music_format not in library_store.AUDIO_FORMATS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Audio format must be one of: {', '.join(library_store.AUDIO_FORMATS)}.",
+        )
+    if settings.music_dir.strip():
+        db.set_setting(library_store.KEY_MUSIC_DIR, settings.music_dir.strip())
+    db.set_setting(library_store.KEY_MUSIC_LAYOUT, settings.music_layout)
+    db.set_setting(library_store.KEY_MUSIC_FORMAT, settings.music_format)
+    db.set_setting(library_store.KEY_MUSIC_LIBRARY_DIRS, settings.music_library_dirs.strip())
+    db.set_setting(library_store.KEY_MUSIC_USE_SPOTDL, "1" if settings.music_use_spotdl else "0")
+
     config.ensure_dirs()
     return await get_settings()
-
-
-@router.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}

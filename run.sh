@@ -8,7 +8,7 @@ VENV="$ROOT/backend/.venv"
 if [[ ! -d "$VENV" ]]; then
   echo "Creating backend virtualenv…"
   python3 -m venv "$VENV"
-  "$VENV/bin/pip" install -q -r "$ROOT/backend/requirements.txt"
+  "$VENV/bin/python" -m pip install -q -e "$ROOT/backend"
 fi
 
 if [[ ! -d "$ROOT/frontend/node_modules" ]]; then
@@ -21,7 +21,7 @@ pids=()
 cleanup() { kill "${pids[@]}" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
-(cd "$ROOT/backend" && PYTHONPATH=. "$VENV/bin/uvicorn" app.main:app --port 8000 --reload) &
+(cd "$ROOT/backend" && PYTHONPATH=. "$VENV/bin/uvicorn" nostos.main:app --port 8000 --reload) &
 pids+=($!)
 
 (cd "$ROOT/frontend" && npm run dev) &
