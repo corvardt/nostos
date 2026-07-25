@@ -183,8 +183,18 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print(f"{label:<12}{value}")
 
     if not where["using"]:
-        print("\nffmpeg is missing. `nostos ffmpeg` will fetch a static build into the data")
-        print("directory, or install it with your package manager, which is the better option.")
+        # Which advice is correct depends on the platform, so ask rather than
+        # assume: macOS has no static build worth shipping, and pointing a mac
+        # user at `nostos ffmpeg` sends them at a command that can only fail.
+        if where["downloadable"]:
+            print("\nffmpeg is missing. `nostos ffmpeg` will fetch a static build into the data")
+            print("directory, or install it with your package manager, which is the better option.")
+        elif sys.platform == "darwin":
+            print("\nffmpeg is missing, and there is no static build for macOS worth shipping.")
+            print("Install it with `brew install ffmpeg`.")
+        else:
+            print("\nffmpeg is missing, and no static build is configured for this platform.")
+            print("Install it with your package manager.")
         return 1
     return 0
 
