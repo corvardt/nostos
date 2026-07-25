@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from app.providers import resolve_provider
-from app.providers.threads import ThreadsProvider
-from app.providers.threads_scrape import extract_media
+from nostos.providers import resolve_provider
+from nostos.providers.threads import ThreadsProvider
+from nostos.providers.threads_scrape import extract_media
 
 # Threads inlines the payload as escaped JSON, hence the \" and \/ sequences.
 VIDEO_PAGE = r'''
@@ -77,6 +77,6 @@ def test_handle_absent_for_short_links() -> None:
 def test_threads_no_longer_uses_ytdlp() -> None:
     # yt-dlp has no Threads extractor; inheriting from it would silently fall
     # through to the `generic` extractor and find nothing.
-    from app.providers.ytdlp_base import YtDlpProvider
+    from nostos.providers.ytdlp_base import YtDlpProvider
 
     assert not isinstance(resolve_provider("https://www.threads.com/t/abc"), YtDlpProvider)

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FormatPicker from "./components/FormatPicker";
 import HistoryList from "./components/HistoryList";
 import JobProgress from "./components/JobProgress";
+import LibraryPanel from "./components/LibraryPanel";
 import PreviewCard from "./components/PreviewCard";
 import QueueList from "./components/QueueList";
 import SettingsPanel from "./components/SettingsPanel";
@@ -9,6 +10,7 @@ import * as api from "./lib/api";
 import type { HistoryEntry, Job, MediaInfo, Settings } from "./lib/types";
 import { extractUrls, looksLikePlaylist } from "./lib/urls";
 import { BATCH_QUALITIES } from "./lib/quality";
+import { useTheme } from "./lib/theme";
 import markUrl from "../assets/down.png";
 
 const POLL_MS = 500;
@@ -45,7 +47,17 @@ function blankJob(id: string, url: string, media?: MediaInfo | null): Job {
   };
 }
 
+/** Two ways in: one link at a time, or whole accounts at once. */
+type View = "links" | "library";
+
+const MODES: Array<{ id: View; name: string; what: string }> = [
+  { id: "links", name: "Links", what: "One page at a time. Video or audio, from a URL you paste." },
+  { id: "library", name: "Library", what: "A whole music collection. Your accounts, archived in one pass." },
+];
+
 export default function App() {
+  const [theme, toggleTheme] = useTheme();
+  const [view, setView] = useState<View>("links");
   const [url, setUrl] = useState("");
   const [info, setInfo] = useState<MediaInfo | null>(null);
   const [format, setFormat] = useState("best");
@@ -277,6 +289,17 @@ export default function App() {
 
   const busy = jobs.some((j) => j.status !== "done" && j.status !== "error" && j.status !== "cancelled");
   const singleJob = jobs.length === 1 ? jobs[0] : null;
+  /** Nothing analyzed, queued, confirmed or broken: the screen is free to explain itself. */
+  const idle = !info && !pending && !error && jobs.length === 0;
+
+  /** A library sync queues through the same job registry, so its downloads
+   *  join the same queue list and are polled by the same timer. */
+  function adoptJobs(jobIds: string[]) {
+    setJobs((prev) => [
+      ...jobIds.filter((id) => !prev.some((j) => j.id === id)).map((id) => blankJob(id, "")),
+      ...prev,
+    ]);
+  }
 
   return (
     <div className="app">
@@ -286,13 +309,41 @@ export default function App() {
         <button
           className="destination"
           onClick={() => setShowSettings((s) => !s)}
-          title="Settings"
+          title="Settings: folders, quality, browser cookies, music filing"
           aria-expanded={showSettings}
         >
-          <span className="eyebrow">to</span>
-          <span className="destination-path">{settings?.download_dir ?? "…"}</span>
+          <span className="eyebrow">saves to</span>
+          <span className="destination-path">
+            {(view === "library" ? settings?.music_dir : settings?.download_dir) ?? "…"}
+          </span>
+        </button>
+        <button
+          className="medium-toggle"
+          onClick={toggleTheme}
+          title={theme === "dark" ? "Switch to paper" : "Switch to tube"}
+          aria-label="Switch medium"
+        >
+          {theme === "dark" ? "tube" : "paper"}
         </button>
       </header>
+
+      {/* The two halves of the app, each saying what it is for. Naming them in
+          the masthead was not enough: half the program was a word most people
+          never clicked. */}
+      <nav className="modes" role="tablist">
+        {MODES.map((mode) => (
+          <button
+            key={mode.id}
+            className={`mode ${view === mode.id ? "mode-on" : ""}`}
+            role="tab"
+            aria-selected={view === mode.id}
+            onClick={() => setView(mode.id)}
+          >
+            <span className="mode-name">{mode.name}</span>
+            <span className="mode-what">{mode.what}</span>
+          </button>
+        ))}
+      </nav>
 
       {showSettings && settings && <SettingsPanel
           settings={settings}
@@ -300,13 +351,18 @@ export default function App() {
           onHistoryCleared={refreshHistory}
         />}
 
+      {view === "library" && (
+        <LibraryPanel onQueued={adoptJobs} onOpenSettings={() => setShowSettings(true)} />
+      )}
+
+      {view === "links" && (
       <form className="intake" onSubmit={onSubmit}>
         <input
           className="input"
           placeholder={
             settings?.auto_download
-              ? "Paste a link to download it automatically"
-              : "Paste a YouTube, Instagram or Threads link"
+              ? "Paste a link — it downloads on its own"
+              : "Paste a link, a playlist, or several at once"
           }
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -319,9 +375,10 @@ export default function App() {
           {analyzing ? "Analyzing…" : "Analyze"}
         </button>
       </form>
+      )}
 
       <div className="stack">
-        {pending && (
+        {view === "links" && pending && (
           <div className="panel batch">
             <div className="batch-body">
               <span className="eyebrow">{pending.title ? "Playlist" : "Batch"}</span>
@@ -369,7 +426,7 @@ export default function App() {
           </div>
         )}
 
-        {info && (
+        {view === "links" && info && (
           <>
             <PreviewCard info={info} />
             <div className="dispatch">
@@ -388,6 +445,53 @@ export default function App() {
               </button>
             </div>
           </>
+        )}
+
+        {/* With nothing in flight there is nothing to read, so the space says what
+            the thing can do instead. It yields the moment real work appears. */}
+        {view === "links" && idle && (
+          <section className="panel guide">
+            <span className="eyebrow">What goes in the box</span>
+            <ul className="guide-list">
+              <li>
+                <span className="guide-key">Any link</span>
+                <span>
+                  YouTube, Instagram and Threads are built and tested. Everything else is
+                  passed to yt-dlp, which knows a thousand other sites — worth a try, not a
+                  promise.
+                </span>
+              </li>
+              <li>
+                <span className="guide-key">Several links</span>
+                <span>
+                  Paste a whole block of them. You get one count, one quality for the lot, and a
+                  confirm step, so a stray paste never starts anything.
+                </span>
+              </li>
+              <li>
+                <span className="guide-key">A playlist</span>
+                <span>
+                  Paste its URL and it is listed without touching a single video, up to 200
+                  items. Queue the ones you want.
+                </span>
+              </li>
+              <li>
+                <span className="guide-key">Audio only</span>
+                <span>
+                  Pick <em>Audio</em> in the quality ladder after analyzing. Title, artist, date,
+                  chapters and cover art are embedded either way.
+                </span>
+              </li>
+              <li>
+                <span className="guide-key">Signed-in pages</span>
+                <span>
+                  Threads always needs a session and Instagram sometimes does. Choose the browser
+                  to borrow cookies from in <button className="link" onClick={() => setShowSettings(true)}>Settings</button>, alongside
+                  subtitles and paste-to-download.
+                </span>
+              </li>
+            </ul>
+          </section>
         )}
 
         {/* One download keeps the full instrument readout; a queue gets rows. */}

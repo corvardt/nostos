@@ -15,7 +15,7 @@ from typing import Any
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError, ExtractorError, match_filter_func
 
-from .. import config
+from .. import config, media
 from ..models import Format, MediaInfo
 from .base import Provider, ProviderError, ProgressCallback
 from .cookies import CookieError, domains_for, scoped_cookie_file
@@ -75,6 +75,13 @@ class YtDlpProvider(Provider):
             # so without this `_speed_str` arrives wrapped in ANSI escape codes.
             "color": "no_color",
         }
+
+        # Only set when ffmpeg is somewhere yt-dlp would not look by itself. On
+        # a machine with a system ffmpeg this stays absent and yt-dlp finds it.
+        ours = media.managed_ffmpeg()
+        if ours and not media.system_ffmpeg():
+            opts["ffmpeg_location"] = str(ours)
+
         return opts
 
     @contextlib.contextmanager

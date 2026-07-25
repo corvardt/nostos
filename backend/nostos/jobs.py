@@ -54,7 +54,7 @@ _lock = threading.Lock()
 # YouTube is happy with parallel downloads. Instagram and Threads throttle or
 # soft-ban on bursts, and the Threads provider costs two page fetches per item
 # (once to resolve, once to download), so both are serialised.
-_WORKERS = {"youtube": 3, "instagram": 1, "threads": 1}
+_WORKERS = {"youtube": 3, "instagram": 1, "threads": 1, "music": 3}
 _DEFAULT_WORKERS = 1
 
 # Seconds to wait before starting an item, for platforms that dislike bursts.

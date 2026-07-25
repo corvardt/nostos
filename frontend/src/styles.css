@@ -1,52 +1,68 @@
-/* Nostos - an instrument panel for moving a file from a URL onto this disk.
+/* Nostos - an instrument for moving a file from a URL onto this disk.
  *
- * Palette derived from the app icon (a white arrow on an azure squircle):
- * the interface inverts it - azure on paper - and spends its only gradient
- * on the transfer meter, the one moment the app exists for.
+ * The same medium as the rest of the family: seven tokens, one typeface, and
+ * two ways of showing them. Dark is a phosphor tube, light emitted on black.
+ * Light is ink on a chart recorder's roll, marks deposited on cool neutral
+ * stock. A tube cannot be inverted, so light mode changes medium rather than
+ * flipping the palette - which is why every rule below is written against the
+ * tokens and never against a colour.
+ *
+ * White (dark) and black (light) are reserved. Nothing reaches them except the
+ * thing the app exists for: a transfer that is actually moving, and a file that
+ * actually landed.
  */
 
-:root {
-  --azure-bright: #2191ff; /* icon, top-left  */
-  --azure: #1470e1; /* icon, mid       */
-  --azure-deep: #054bb4; /* icon, shadow    */
+:root,
+:root[data-theme="dark"] {
+  color-scheme: dark;
 
-  --paper: #f7f8fa;
-  --panel: #ffffff;
-  --ink: #0a1628;
-  --slate: #5a6b85;
-  --rule: #dde3ec;
-  --sunken: #eef1f6;
+  --c-void: #0a0a0b;
+  --c-panel: #0f0f11;
+  --c-line: #26262b;
+  --c-land: #4c4c55;
+  --c-dim: #7b7b81;
+  --c-text: #c8c8cc;
+  --c-strike: #ffffff;
 
-  --ok: #047857;
-  --warn: #b45309;
-  --bad: #be123c;
-
-  /* The icon is a squircle; the interface echoes its generous rounding. */
-  --r-lg: 16px;
-  --r-md: 11px;
-  --r-sm: 8px;
-
-  --sans: "IBM Plex Sans", system-ui, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, monospace;
-
-  color-scheme: light;
+  --ink-hot: #ffffff;
+  --ink-rest: #c8c8cc;
+  --bloom: rgb(255 255 255 / 14%);
+  --bloom-hot: rgb(255 255 255 / 30%);
+  --scan: rgb(255 255 255 / 5%);
+  --vignette: rgb(0 0 0 / 62%);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0b1220;
-    --panel: #121b2b;
-    --ink: #e8edf5;
-    --slate: #90a1bd;
-    --rule: #24314a;
-    --sunken: #0e1727;
+:root[data-theme="light"] {
+  color-scheme: light;
 
-    --ok: #34d399;
-    --warn: #fbbf24;
-    --bad: #fb7185;
+  --c-void: #dedee0;
+  --c-panel: #e7e7e9;
+  --c-line: #c2c2c6;
+  --c-land: #9a9aa2;
+  --c-dim: #626268;
+  --c-text: #2a2a2e;
+  --c-strike: #000000;
 
-    color-scheme: dark;
-  }
+  --ink-hot: #000000;
+  --ink-rest: #2a2a2e;
+  /* Ink bleeds into paper fibres rather than glowing. */
+  --bloom: rgb(0 0 0 / 16%);
+  --bloom-hot: rgb(0 0 0 / 28%);
+  --scan: rgb(0 0 0 / 4.5%);
+  --vignette: rgb(0 0 0 / 14%);
+}
+
+:root {
+  --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* An instrument reads small and precise. */
+  --t-2xs: 10px;
+  --t-xs: 11px;
+  --t-sm: 12px;
+  --t-base: 13px;
+
+  --track-label: 0.14em;
+  --track-mark: 0.22em;
 }
 
 * {
@@ -54,419 +70,557 @@
 }
 
 html,
+body,
+#root {
+  height: 100%;
+}
+
 body {
   margin: 0;
-}
-
-/* Scrolling stays, the scrollbar goes - nothing in this panel should compete
- * with the transfer meter for attention. */
-html,
-body {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* legacy Edge */
-}
-
-html::-webkit-scrollbar,
-body::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
-}
-
-body {
-  background: var(--paper);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-size: 15px;
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
-}
-
-/* Every number in this interface is monospaced and tabular, so digits never
- * jitter while a transfer is running. */
-.num {
+  background: var(--c-void);
+  color: var(--c-text);
   font-family: var(--mono);
+  font-size: var(--t-base);
+  line-height: 20px;
+  -webkit-font-smoothing: antialiased;
+  /* Digits must not jitter as readouts tick. */
   font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
 }
+
+:focus-visible {
+  outline: 1px solid var(--c-text);
+  outline-offset: 2px;
+}
+
+/* ── The glass ───────────────────────────────────────────────────────────────
+   Sits above everything, catches no pointer events, and is the only place the
+   retro treatment lives; the interface underneath stays clean. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      var(--scan) 0,
+      var(--scan) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    radial-gradient(125% 105% at 50% 50%, transparent 52%, var(--vignette) 100%);
+}
+
+/* Phosphor bloom is applied by the rules that earn it - the transfer meter, a
+   landed file, the selected channel - rather than offered as a utility. The
+   glow marks what is actually reading, and a class anyone can add would stop
+   meaning that.
+
+   ── The decay rule ──────────────────────────────────────────────────────────
+   Anything that arrives comes in at full strike and settles into the gray of
+   the interface. A sync of forty tracks is forty things arriving. */
+@keyframes settle {
+  from {
+    color: var(--ink-hot);
+    text-shadow: 0 0 10px var(--bloom-hot);
+  }
+  to {
+    color: var(--ink-rest);
+    text-shadow: 0 0 6px var(--bloom);
+  }
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.settle {
+  animation: settle 1.4s ease-out;
+}
+
+/* ── Shell ─────────────────────────────────────────────────────────────────── */
 
 .app {
-  max-width: 660px;
+  position: relative;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 32px 20px 96px;
+  padding: 28px 20px 40px;
 }
-
-/* ------------------------------------------------------------------ header */
 
 .masthead {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 18px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--rule);
+  gap: 14px;
+  padding-bottom: 14px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--c-line);
 }
 
 .mark {
-  width: 30px;
-  height: 30px;
-  border-radius: 9px;
-  display: block;
-  flex-shrink: 0;
+  /* The icon is the one coloured artefact left; the medium takes it too. */
+  filter: grayscale(1) contrast(1.1) brightness(1.4);
+  opacity: 0.85;
+}
+
+:root[data-theme="light"] .mark {
+  filter: grayscale(1) contrast(1.1) brightness(0.4);
 }
 
 .wordmark {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
   margin: 0;
+  font-size: var(--t-base);
+  font-weight: 600;
+  letter-spacing: var(--track-mark);
+  text-transform: uppercase;
+  color: var(--c-text);
+}
+
+/* ── Modes ───────────────────────────────────────────────────────────────────
+   Two ways in: one link at a time, or whole accounts at once. Each states what
+   it is for, because the second one is a different program wearing the same
+   chrome and a one-word tab hid it completely. The selected one is struck
+   along its top edge in the reserved ink - a channel indicator, not a tab. */
+
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin-bottom: 18px;
+  background: var(--c-line);
+}
+
+.mode {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  text-align: left;
+  background: var(--c-void);
+  border: none;
+  border-top: 1px solid transparent;
+  cursor: pointer;
+}
+
+.mode-name {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-mark);
+  text-transform: uppercase;
+  color: var(--c-dim);
+}
+
+.mode-what {
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
+  line-height: 1.5;
+  color: var(--c-land);
+}
+
+.mode:hover .mode-name,
+.mode:hover .mode-what {
+  color: var(--c-text);
+}
+
+.mode-on {
+  background: var(--c-panel);
+  border-top-color: var(--c-strike);
+}
+
+.mode-on .mode-name {
+  color: var(--c-strike);
+  text-shadow: 0 0 8px var(--bloom);
+}
+
+.mode-on .mode-what {
+  color: var(--c-text);
+}
+
+@media (max-width: 560px) {
+  .modes {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Guide ───────────────────────────────────────────────────────────────────
+   What occupies the readout when there is nothing to read. It is prose, so it
+   breaks the 10px label rule on purpose: labels are scanned, this is read. */
+
+.guide {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.guide-lede {
+  margin: 0;
+  font-size: var(--t-xs);
+  line-height: 1.65;
+  color: var(--c-text);
+}
+
+.guide-list,
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.guide-list li,
+.guide-steps li {
+  display: grid;
+  gap: 3px 12px;
+  font-size: var(--t-xs);
+  line-height: 1.6;
+  color: var(--c-land);
+}
+
+.guide-list li {
+  grid-template-columns: 108px 1fr;
+}
+
+.guide-steps li {
+  grid-template-columns: 14px 88px 1fr;
+}
+
+.guide-steps .num {
+  font-size: var(--t-2xs);
+  color: var(--c-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.guide-key {
+  font-size: var(--t-2xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-text);
+}
+
+.guide-list em,
+.guide-steps em {
+  font-style: normal;
+  color: var(--c-text);
+}
+
+@media (max-width: 560px) {
+  .guide-list li,
+  .guide-steps li {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Services ────────────────────────────────────────────────────────────────
+   Named and priced before you commit to a form: the cost of connecting is the
+   thing worth knowing first. */
+
+.services {
+  display: flex;
+  flex-direction: column;
+}
+
+.service {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--c-line);
+}
+
+.service:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.service-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
 }
 
 /* The destination is the app's promise, so it stays visible at all times. */
 .destination {
-  margin-left: auto;
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 8px;
   min-width: 0;
+  margin-left: auto;
+  padding: 4px 0;
   background: none;
   border: none;
-  padding: 6px 10px;
-  border-radius: var(--r-sm);
+  color: var(--c-dim);
+  font-family: var(--mono);
   cursor: pointer;
-  color: var(--slate);
-  font-size: 12px;
-  font-family: inherit;
 }
 
 .destination:hover {
-  background: var(--sunken);
-  color: var(--ink);
+  color: var(--c-text);
 }
 
 .destination-path {
-  font-family: var(--mono);
-  font-size: 12px;
-  max-width: 260px;
   overflow: hidden;
+  max-width: 190px;
+  font-size: var(--t-2xs);
   text-overflow: ellipsis;
   white-space: nowrap;
-  direction: rtl; /* keep the folder name visible when the path is long */
-  text-align: left;
 }
 
-.eyebrow {
+.medium-toggle {
+  padding: 4px 6px;
   font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
-  color: var(--slate);
-}
-
-/* ------------------------------------------------------------------- input */
-
-.intake {
-  display: flex;
-  gap: 10px;
-}
-
-.input {
-  flex: 1;
-  min-width: 0;
-  padding: 14px 16px;
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-size: 15px;
-  outline: none;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.input::placeholder {
-  color: var(--slate);
-}
-
-.input:focus-visible {
-  border-color: var(--azure);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--azure) 18%, transparent);
-}
-
-.btn {
-  padding: 14px 20px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--rule);
-  background: var(--panel);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.15s, background 0.15s, transform 0.06s;
-}
-
-.btn:hover:not(:disabled) {
-  border-color: var(--azure);
-  color: var(--azure);
-}
-
-.btn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-
-.btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.btn-primary {
-  background: var(--azure);
-  border-color: var(--azure);
-  color: #fff;
-}
-
-.btn-primary:hover:not(:disabled) {
-  background: var(--azure-deep);
-  border-color: var(--azure-deep);
-  color: #fff;
-}
-
-.link {
+  color: var(--c-land);
   background: none;
   border: none;
-  padding: 0;
-  color: var(--azure);
-  font-family: inherit;
-  font-size: inherit;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
 }
 
-@media (prefers-color-scheme: dark) {
-  .link {
-    color: var(--azure-bright);
-  }
+.medium-toggle:hover {
+  color: var(--c-text);
 }
 
-:focus-visible {
-  outline: 2px solid var(--azure);
-  outline-offset: 2px;
+/* ── Labels ────────────────────────────────────────────────────────────────── */
+
+.eyebrow {
+  font-size: var(--t-2xs);
+  font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
 }
 
-/* ------------------------------------------------------------------ panels */
+.num {
+  font-weight: 600;
+  color: var(--c-text);
+}
+
+/* ── Panels ──────────────────────────────────────────────────────────────────
+   Corner ticks instead of a full border: the frame reads as an instrument
+   bezel and leaves the edges of the readout open. */
 
 .panel {
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-lg);
-  padding: 18px;
+  position: relative;
+  padding: 16px;
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+}
+
+.panel::before,
+.panel::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  pointer-events: none;
+  border-color: var(--c-land);
+  border-style: solid;
+}
+
+.panel::before {
+  top: -1px;
+  left: -1px;
+  border-width: 1px 0 0 1px;
+}
+
+.panel::after {
+  right: -1px;
+  bottom: -1px;
+  border-width: 0 1px 1px 0;
+}
+
+.panel-ok {
+  border-color: var(--c-land);
+}
+
+.panel-bad {
+  border-color: var(--c-dim);
 }
 
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  margin-top: 16px;
+  gap: 14px;
 }
 
-/* ----------------------------------------------------------------- preview */
+/* ── Intake ────────────────────────────────────────────────────────────────── */
 
-.preview {
+.intake {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
-}
-
-.thumb-wrap {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.thumb {
-  width: 160px;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: var(--r-sm);
-  display: block;
-  background: var(--sunken);
-}
-
-.thumb-square {
-  aspect-ratio: 1;
-  width: 110px;
-}
-
-.duration {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  padding: 2px 6px;
-  border-radius: 5px;
-  background: rgba(10, 22, 40, 0.82);
-  color: #fff;
-  font-family: var(--mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-}
-
-.preview-body {
-  min-width: 0;
-  flex: 1;
-}
-
-.preview-title {
-  margin: 8px 0 4px;
-  font-size: 16px;
-  font-weight: 500;
-  line-height: 1.35;
-  letter-spacing: -0.005em;
-  /* Captions can be long; show a readable excerpt rather than a wall. */
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.preview-author {
-  margin: 0;
-  color: var(--slate);
-  font-size: 13px;
-  font-family: var(--mono);
-}
-
-/* Platform is stated as a label, not a colored pill - the three platforms
- * differ in what they require of you, and that is what the row records. */
-.source {
-  display: flex;
-  align-items: center;
   gap: 8px;
+  margin-bottom: 14px;
 }
 
-.source-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--azure);
-}
-
-/* --------------------------------------------------------- format ladder */
-
-.ladder {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 4px;
-}
-
-.rung {
-  padding: 7px 12px;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  background: var(--panel);
-  color: var(--slate);
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 11px;
   font-family: var(--mono);
-  font-size: 13px;
-  cursor: pointer;
-  transition: border-color 0.12s, color 0.12s, background 0.12s;
+  font-size: var(--t-sm);
+  color: var(--c-text);
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 0;
 }
 
-.rung:hover:not(:disabled) {
-  border-color: var(--azure);
-  color: var(--ink);
+.input::placeholder {
+  color: var(--c-land);
 }
 
-.rung[aria-pressed="true"] {
-  border-color: var(--azure);
-  background: color-mix(in srgb, var(--azure) 10%, transparent);
-  color: var(--azure);
+.input:focus {
+  outline: none;
+  border-color: var(--c-dim);
+}
+
+.mono-input {
+  font-size: var(--t-xs);
+}
+
+textarea.input {
+  resize: vertical;
+  line-height: 17px;
+}
+
+.select {
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: var(--t-sm);
+  color: var(--c-text);
+  background: var(--c-panel);
+  border: 1px solid var(--c-line);
+  border-radius: 0;
+}
+
+/* ── Controls ────────────────────────────────────────────────────────────── */
+
+.btn {
+  padding: 8px 14px;
+  font-family: var(--mono);
+  font-size: var(--t-2xs);
   font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-text);
+  background: none;
+  border: 1px solid var(--c-line);
+  border-radius: 0;
+  cursor: pointer;
 }
 
-.rung:disabled {
-  opacity: 0.45;
+.btn:hover:not(:disabled) {
+  color: var(--c-strike);
+  border-color: var(--c-dim);
+}
+
+.btn:disabled {
+  color: var(--c-land);
   cursor: not-allowed;
 }
 
-.rung-size {
-  display: block;
-  font-size: 10px;
-  color: var(--slate);
-  font-weight: 400;
+.btn-primary {
+  color: var(--c-strike);
+  border-color: var(--c-land);
 }
 
-.dispatch {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-  gap: 16px;
-  margin-top: 16px;
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--c-strike);
+  box-shadow: 0 0 10px var(--bloom);
 }
 
-/* --------------------------------------------------- transfer readout */
-/* The signature element: the moment a file crosses onto this disk, reported
- * like a measuring instrument rather than a decorative bar. */
-
-.transfer-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: 12px;
+.btn-danger:hover:not(:disabled) {
+  color: var(--c-strike);
+  border-color: var(--c-strike);
 }
 
-.transfer-pct {
+.link {
+  padding: 0;
   font-family: var(--mono);
-  font-size: 26px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
-.track {
-  height: 10px;
-  border-radius: 999px;
-  background: var(--sunken);
-  overflow: hidden;
+.link:hover {
+  color: var(--c-strike);
 }
 
-.track-fill {
-  height: 100%;
-  border-radius: 999px;
-  /* The icon's own gradient - the app's one chromatic flourish. */
-  background: linear-gradient(90deg, var(--azure-bright), var(--azure-deep));
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+.link:disabled {
+  color: var(--c-land);
+  cursor: not-allowed;
 }
 
-.readout {
+/* ── Batch confirm ─────────────────────────────────────────────────────────── */
+
+.batch {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-  color: var(--slate);
+  flex-direction: column;
+  gap: 14px;
 }
 
-.transfer-idle .track-fill {
-  /* Queued: no measurement yet, so the track breathes instead of lying. */
-  animation: pulse 1.6s ease-in-out infinite;
+.batch-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-  }
-  50% {
-    opacity: 1;
-  }
+.batch-count {
+  margin: 0;
+  font-size: var(--t-base);
+  color: var(--c-text);
 }
 
-/* ------------------------------------------------------------- outcomes */
+.batch-count .num {
+  font-size: 20px;
+  color: var(--c-strike);
+  text-shadow: 0 0 8px var(--bloom);
+}
+
+.batch-sub,
+.hint,
+.queue-note {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: var(--c-dim);
+}
+
+.dup {
+  color: var(--c-text);
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── Outcome ─────────────────────────────────────────────────────────────────
+   A landed file reaches the reserved ink; nothing else in the interface does. */
 
 .outcome {
   display: flex;
@@ -475,187 +629,240 @@ body {
 }
 
 .outcome-body {
-  min-width: 0;
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  align-items: flex-start;
 }
 
 .outcome-label {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.1em;
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: var(--track-label);
   text-transform: uppercase;
+  color: var(--c-dim);
 }
 
 .panel-ok .outcome-label {
-  color: var(--ok);
+  color: var(--c-strike);
+  text-shadow: 0 0 8px var(--bloom-hot);
 }
 
 .panel-bad .outcome-label {
-  color: var(--bad);
-}
-
-.panel-ok {
-  border-color: color-mix(in srgb, var(--ok) 40%, var(--rule));
-}
-
-.panel-bad {
-  border-color: color-mix(in srgb, var(--bad) 40%, var(--rule));
-}
-
-.filepath {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--slate);
-  word-break: break-all;
-  margin: 6px 0 0;
+  color: var(--c-text);
 }
 
 .outcome-msg {
-  margin: 6px 0 0;
-  font-size: 14px;
-}
-
-/* -------------------------------------------------------------- history */
-
-.ledger {
-  margin-top: 40px;
-}
-
-.ledger-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.rows {
-  list-style: none;
   margin: 0;
-  padding: 0;
+  font-size: var(--t-sm);
 }
 
-.row {
+.filepath {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: var(--c-text);
+  overflow-wrap: anywhere;
+}
+
+/* ── Preview ─────────────────────────────────────────────────────────────── */
+
+.preview {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 11px 4px;
-  border-bottom: 1px solid var(--rule);
-}
-
-.row:last-child {
-  border-bottom: none;
-}
-
-.row-status {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.row-done {
-  background: var(--ok);
-}
-
-.row-error {
-  background: var(--bad);
-}
-
-.row-title {
-  flex: 1;
-  min-width: 0;
-  font-size: 14px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  color: inherit;
-  text-decoration: none;
-}
-
-.row-title:hover {
-  color: var(--azure);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .row-title:hover {
-    color: var(--azure-bright);
-  }
-}
-
-.row-meta {
-  font-family: var(--mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--slate);
-  flex-shrink: 0;
-}
-
-.empty {
-  padding: 28px 4px;
-  color: var(--slate);
-  font-size: 14px;
-}
-
-/* ---------------------------------------------------------------- batch */
-
-.batch {
-  display: flex;
-  flex-direction: column;
   gap: 14px;
 }
 
-.batch .batch-actions {
-  justify-content: flex-end;
+.thumb-wrap {
+  position: relative;
+  flex-shrink: 0;
 }
 
-.batch-count {
-  margin: 4px 0 0;
-  font-size: 15px;
+.thumb {
+  display: block;
+  width: 132px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--c-void);
+  /* The medium takes the thumbnail too, or it is the only colour on the tube. */
+  filter: grayscale(1) contrast(1.05);
 }
 
-.batch-count .num {
-  font-family: var(--mono);
-  font-size: 20px;
-  font-variant-numeric: tabular-nums;
-  margin-right: 4px;
+.thumb-square {
+  aspect-ratio: 1;
 }
 
-.batch-actions {
+.duration {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  padding: 1px 4px;
+  font-size: var(--t-2xs);
+  color: var(--c-strike);
+  background: var(--c-void);
+}
+
+.preview-body {
   display: flex;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 }
 
-/* ---------------------------------------------------------------- queue */
+.source {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 
-.queue-tally {
+.source-dot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  background: var(--c-text);
+}
+
+.live {
+  color: var(--c-strike);
+}
+
+.preview-title {
+  margin: 0;
+  font-size: var(--t-base);
+  font-weight: 500;
+  color: var(--c-strike);
+}
+
+.preview-author {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: var(--c-dim);
+}
+
+/* ── Quality ladder ──────────────────────────────────────────────────────── */
+
+.dispatch {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.ladder {
+  display: flex;
+  gap: 1px;
+  margin-top: 6px;
+  background: var(--c-line);
+  border: 1px solid var(--c-line);
+}
+
+.rung {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 11px;
   font-family: var(--mono);
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  color: var(--slate);
+  font-size: var(--t-xs);
+  color: var(--c-dim);
+  background: var(--c-panel);
+  border: none;
+  cursor: pointer;
 }
 
-.queue-failed {
-  color: var(--bad);
+.rung:hover:not(:disabled) {
+  color: var(--c-text);
 }
+
+.rung[aria-pressed="true"] {
+  color: var(--c-strike);
+  background: var(--c-void);
+}
+
+.rung:disabled {
+  color: var(--c-land);
+  cursor: not-allowed;
+}
+
+.rung-size {
+  font-size: var(--t-2xs);
+  color: var(--c-land);
+}
+
+/* ── Transfer ────────────────────────────────────────────────────────────────
+   The meter is the one moment the app exists for, so it is the one place the
+   reserved ink is spent on something still moving. */
+
+.transfer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.queue-head-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.transfer-pct {
+  font-size: var(--t-base);
+  font-weight: 600;
+  color: var(--c-strike);
+  text-shadow: 0 0 10px var(--bloom-hot);
+}
+
+.transfer-idle .transfer-pct {
+  color: var(--c-dim);
+  text-shadow: none;
+}
+
+.track {
+  height: 3px;
+  background: var(--c-line);
+}
+
+.track-fill {
+  height: 100%;
+  background: var(--c-strike);
+  box-shadow: 0 0 8px var(--bloom-hot);
+  transition: width 220ms linear;
+}
+
+.transfer-idle .track-fill {
+  background: var(--c-land);
+  box-shadow: none;
+  animation: breathe 2.8s ease-in-out infinite;
+}
+
+.readout {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: var(--t-xs);
+  color: var(--c-dim);
+}
+
+/* ── Queue ───────────────────────────────────────────────────────────────── */
 
 .queue {
-  list-style: none;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
-  max-height: 320px;
-  overflow-y: auto;
+  list-style: none;
 }
 
 .queue-item {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
   padding: 7px 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--c-line);
+  animation: arrive 320ms ease-out;
 }
 
 .queue-item:last-child {
@@ -665,183 +872,412 @@ body {
 .queue-title {
   flex: 1;
   min-width: 0;
-  font-size: 13px;
-  white-space: nowrap;
   overflow: hidden;
+  font-size: var(--t-sm);
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .queue-bar {
-  width: 72px;
-  height: 4px;
-  border-radius: 999px;
-  background: var(--sunken);
-  overflow: hidden;
+  width: 64px;
+  height: 2px;
   flex-shrink: 0;
+  background: var(--c-line);
 }
 
 .queue-fill {
   display: block;
   height: 100%;
-  border-radius: 999px;
-  background: linear-gradient(90deg, var(--azure-bright), var(--azure-deep));
-  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  background: var(--c-strike);
+  transition: width 220ms linear;
 }
 
-.queue-state {
+.queue-state,
+.queue-tally,
+.row-meta {
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
+  white-space: nowrap;
+}
+
+.queue-failed {
+  color: var(--c-text);
+}
+
+.queue-action,
+.queue-stop {
+  padding: 0 2px;
   font-family: var(--mono);
-  font-size: 11px;
-  font-variant-numeric: tabular-nums;
-  color: var(--slate);
-  width: 46px;
-  text-align: right;
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.queue-action:hover,
+.queue-stop:hover {
+  color: var(--c-strike);
+}
+
+.queue-note {
+  margin-top: 10px;
+}
+
+/* Status dots. A running job breathes, because a still dot cannot be told from
+   a stalled one. */
+.row-status,
+[class^="queue-dot-"] {
+  width: 5px;
+  height: 5px;
   flex-shrink: 0;
-}
-
-.queue-dot-done {
-  background: var(--ok);
-}
-
-.queue-dot-error {
-  background: var(--bad);
+  background: var(--c-land);
 }
 
 .queue-dot-running {
-  background: var(--azure);
+  background: var(--c-strike);
+  box-shadow: 0 0 6px var(--bloom-hot);
+  animation: breathe 2.8s ease-in-out infinite;
 }
 
 .queue-dot-queued {
-  background: var(--rule);
+  background: var(--c-land);
 }
 
-@media (max-width: 560px) {
-  .queue-bar {
-    display: none;
-  }
+.queue-dot-done {
+  background: var(--c-text);
 }
 
-/* --------------------------------------------------------------- footer */
-
-.footer {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 44px;
-  padding-top: 14px;
-  border-top: 1px solid var(--rule);
+.queue-dot-error {
+  background: var(--c-strike);
 }
 
-.footer-link {
-  font-family: var(--mono);
-  font-size: 12px;
-  color: var(--slate);
-  text-decoration: none;
+.queue-dot-cancelled {
+  background: var(--c-line);
 }
 
-.footer-link::before {
-  content: "@";
-  opacity: 0.55;
-}
+/* ── Rows (history, tracks) ──────────────────────────────────────────────── */
 
-.footer-link:hover {
-  color: var(--azure);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-
-@media (prefers-color-scheme: dark) {
-  .footer-link:hover {
-    color: var(--azure-bright);
-  }
-}
-
-/* ------------------------------------------------------------- settings */
-
-.settings {
+.rows {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  margin-bottom: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: var(--t-sm);
+  color: var(--c-text);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.row-title:hover {
+  color: var(--c-strike);
+}
+
+.row-reason {
+  color: var(--c-dim);
+}
+
+.row-done {
+  background: var(--c-text);
+}
+
+.row-error {
+  background: var(--c-strike);
+}
+
+.empty {
+  margin: 0;
+  font-size: var(--t-xs);
+  color: var(--c-land);
+}
+
+/* ── Ledger ──────────────────────────────────────────────────────────────── */
+
+.ledger {
+  margin-top: 26px;
+}
+
+.ledger-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--c-line);
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
 
 .field {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 5px;
+  margin-bottom: 16px;
 }
 
 .field-label {
-  font-size: 13px;
+  font-size: var(--t-2xs);
   font-weight: 500;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
 }
 
 .field-help {
-  font-size: 12px;
-  color: var(--slate);
   margin: 0;
-}
-
-.select {
-  padding: 11px 13px;
-  background: var(--panel);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-md);
-  color: var(--ink);
-  font-family: var(--sans);
-  font-size: 14px;
-  outline: none;
+  font-size: var(--t-xs);
+  line-height: 16px;
+  color: var(--c-land);
 }
 
 .toggle {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   cursor: pointer;
 }
 
 .toggle input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--azure);
-  cursor: pointer;
-  margin: 0;
+  accent-color: var(--c-text);
 }
 
 .settings-foot {
   display: flex;
-  gap: 12px;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.mono-input {
+.settings {
+  margin-bottom: 14px;
+}
+
+/* ── Library ─────────────────────────────────────────────────────────────── */
+
+.source-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--c-line);
+}
+
+.source-row:last-of-type {
+  border-bottom: none;
+}
+
+.source-body {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-right: auto;
+  min-width: 0;
+}
+
+.source-name {
+  font-size: var(--t-sm);
+  color: var(--c-text);
+}
+
+/* A disabled source stays listed, dimmed: it is configuration you may want
+   back, not a mistake. */
+.source-off {
+  background: var(--c-line);
+}
+
+.source-form {
+  margin-top: 14px;
+  background: var(--c-void);
+}
+
+.library-sources .settings-foot {
+  margin-top: 14px;
+}
+
+.report-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 26px;
+  margin-top: 10px;
+}
+
+/* Figure above label, so the row reads as a set of gauges. */
+.report-grid div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.report-grid .num {
+  font-size: 19px;
+  color: var(--c-strike);
+  text-shadow: 0 0 8px var(--bloom);
+}
+
+.report-grid span {
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
+}
+
+.library-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 10px 0 8px;
+}
+
+.chip {
+  padding: 4px 9px;
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-dim);
+  background: none;
+  border: 1px solid var(--c-line);
+  cursor: pointer;
 }
 
-/* ---------------------------------------------------------------- motion */
-
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+.chip:hover {
+  color: var(--c-text);
 }
 
-/* ---------------------------------------------------------------- mobile */
+.chip-on {
+  color: var(--c-strike);
+  border-color: var(--c-dim);
+}
+
+.chip-search {
+  flex: 1;
+  min-width: 110px;
+  padding: 4px 8px;
+  font-size: var(--t-xs);
+}
+
+/* The track list can run to thousands of rows, so it scrolls inside the panel
+   rather than pushing the queue and the history off the page. */
+.library-tracks .rows {
+  max-height: 440px;
+  overflow-y: auto;
+  /* Setting only overflow-y makes the other axis compute to auto, which is how
+     a long title earns a horizontal bar. The titles already ellipsis; nothing
+     here is ever meant to be reached by scrolling sideways. */
+  overflow-x: hidden;
+}
+
+/* Why one track failed is worth reading once, for the row you are asking
+   about - printed against every failure it is just noise down the list. It
+   unfolds on hover, or on focus, which a click gives it. */
+.library-tracks .row-reason {
+  display: none;
+}
+
+.library-tracks .row:hover .row-reason,
+.library-tracks .row:focus .row-reason {
+  display: inline;
+}
+
+.library-tracks .row[tabindex] {
+  cursor: help;
+}
+
+/* The library's rows carry the status as a word as well as a dot, because
+   "on disk" and "missing" are decisions rather than progress. A fixed column
+   ranged right, so the list has one clean edge to scan down. */
+.track-status {
+  flex-shrink: 0;
+  width: 72px;
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-align: right;
+  text-transform: uppercase;
+  color: var(--c-land);
+}
+
+.row-downloaded .track-status,
+.row-queued .track-status {
+  color: var(--c-text);
+}
+
+.row-failed .track-status {
+  color: var(--c-strike);
+}
+
+.row-wanted .track-status {
+  color: var(--c-dim);
+}
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 30px;
+  padding-top: 12px;
+  border-top: 1px solid var(--c-line);
+}
+
+.footer-link {
+  font-size: var(--t-2xs);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--c-land);
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  color: var(--c-text);
+}
+
+/* ── Scrollbars ──────────────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--c-line);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--c-land);
+}
 
 @media (max-width: 560px) {
-  .app {
-    padding: 24px 16px 64px;
-  }
-
-  .intake {
-    flex-direction: column;
-  }
-
   .preview {
     flex-direction: column;
   }
@@ -850,115 +1286,21 @@ body {
     width: 100%;
   }
 
-  .thumb-square {
-    width: 100%;
-  }
-
   .destination-path {
-    max-width: 120px;
-  }
-
-  .dispatch {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .readout {
-    flex-direction: column;
-    gap: 4px;
+    max-width: 110px;
   }
 }
 
-.batch-body {
-  min-width: 0;
-}
+@media (prefers-reduced-motion: reduce) {
+  .settle,
+  .queue-item,
+  .transfer-idle .track-fill,
+  .queue-dot-running {
+    animation: none;
+  }
 
-.batch-sub {
-  margin: 2px 0 0;
-  font-size: 12px;
-  color: var(--slate);
-  font-family: var(--mono);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 340px;
-}
-
-.eyebrow.live {
-  color: var(--bad);
-}
-
-.hint {
-  margin: 6px 0 0;
-  font-size: 13px;
-  color: var(--slate);
-}
-
-
-.queue-head-right {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.queue-stop {
-  background: none;
-  border: none;
-  color: var(--slate);
-  font-size: 17px;
-  line-height: 1;
-  padding: 0 2px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.queue-stop:hover {
-  color: var(--bad);
-}
-
-.queue-dot-cancelled {
-  background: var(--slate);
-}
-
-.queue-action {
-  background: none;
-  border: 1px solid var(--rule);
-  border-radius: var(--r-sm);
-  color: var(--slate);
-  font-family: var(--sans);
-  font-size: 11px;
-  padding: 3px 8px;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.queue-action:hover {
-  border-color: var(--azure);
-  color: var(--azure);
-}
-
-.queue-note {
-  margin: 12px 0 0;
-  font-size: 12px;
-  color: var(--slate);
-}
-
-.hint.dup {
-  color: var(--warn);
-}
-
-.row-reason {
-  color: var(--bad);
-  font-size: 12px;
-}
-
-.btn-danger {
-  border-color: var(--bad);
-  color: var(--bad);
-}
-
-.btn-danger:hover:not(:disabled) {
-  background: var(--bad);
-  border-color: var(--bad);
-  color: #fff;
+  .track-fill,
+  .queue-fill {
+    transition: none;
+  }
 }

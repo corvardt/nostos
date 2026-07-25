@@ -1,8 +1,0 @@
-fastapi
-uvicorn[standard]
-yt-dlp
-pydantic>=2
-
-# Required on Linux to decrypt Chromium-family cookie stores (Chrome, Brave,
-# Chromium, Edge, Opera, Vivaldi) via the OS keyring. Firefox does not need it.
-secretstorage; sys_platform == "linux"

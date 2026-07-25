@@ -103,6 +103,82 @@ export default function SettingsPanel({ settings, onSaved, onHistoryCleared }: P
         </p>
       </label>
 
+      <label className="field">
+        <span className="field-label">Music folder</span>
+        <input
+          className="input mono-input"
+          value={draft.music_dir}
+          spellCheck={false}
+          onChange={(e) => setDraft({ ...draft, music_dir: e.target.value })}
+        />
+        <p className="field-help">
+          Where the Library tab archives songs. Separate from the download folder, so an archive
+          does not get mixed in with one-off videos.
+        </p>
+      </label>
+
+      <label className="field">
+        <span className="field-label">Filing</span>
+        <select
+          className="select"
+          value={draft.music_layout}
+          onChange={(e) => setDraft({ ...draft, music_layout: e.target.value })}
+        >
+          <option value="flat">All in one folder</option>
+          <option value="artist">One folder per artist</option>
+          <option value="artist-album">Artist, then album</option>
+        </select>
+      </label>
+
+      <label className="field">
+        <span className="field-label">Audio format</span>
+        <select
+          className="select"
+          value={draft.music_format}
+          onChange={(e) => setDraft({ ...draft, music_format: e.target.value })}
+        >
+          {["mp3", "m4a", "opus", "flac"].map((f) => (
+            <option key={f} value={f}>
+              {f}
+            </option>
+          ))}
+        </select>
+        <p className="field-help">
+          Everything here is re-encoded from a compressed source, so flac buys size, not fidelity.
+        </p>
+      </label>
+
+      <label className="field">
+        <span className="field-label">Music you already have</span>
+        <textarea
+          className="input mono-input"
+          rows={3}
+          value={draft.music_library_dirs}
+          spellCheck={false}
+          placeholder={"/home/you/Music/Spotify\n/home/you/Music/Youtube"}
+          onChange={(e) => setDraft({ ...draft, music_library_dirs: e.target.value })}
+        />
+        <p className="field-help">
+          One folder per line. Anything matched in these is never downloaded again, whichever
+          service it turns up on.
+        </p>
+      </label>
+
+      <div className="field">
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={draft.music_use_spotdl}
+            onChange={(e) => setDraft({ ...draft, music_use_spotdl: e.target.checked })}
+          />
+          <span className="field-label">Use spotdl to pick the video</span>
+        </label>
+        <p className="field-help">
+          When spotdl is installed, it matches against Spotify's catalogue first, which picks the
+          right video more often than a title search. Ignored if it is not installed.
+        </p>
+      </div>
+
       {settings.db_path && (
         <div className="field">
           <span className="field-label">History database</span>

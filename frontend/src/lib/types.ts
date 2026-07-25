@@ -89,4 +89,80 @@ export interface Settings {
   subtitle_langs: string;
   /** Where the history database lives. Read-only - the server sets it. */
   db_path?: string;
+
+  // --- library sync ---
+  /** Where archived music lands. Kept apart from download_dir on purpose. */
+  music_dir: string;
+  /** flat | artist | artist-album */
+  music_layout: string;
+  music_format: string;
+  /** Folders you already keep music in, one per line. Never re-downloaded. */
+  music_library_dirs: string;
+  /** Let spotdl choose the video when it is installed. */
+  music_use_spotdl: boolean;
+}
+
+// --------------------------------------------------------------------- library
+
+export type TrackStatus =
+  | "wanted"
+  | "queued"
+  | "downloaded"
+  | "owned"
+  | "failed"
+  | "skipped";
+
+export interface SourceType {
+  type: string;
+  description: string;
+  secrets: string[];
+}
+
+export interface SourceConfig {
+  id?: number;
+  type: string;
+  label: string;
+  enabled: boolean;
+  /** Secrets come back from the server masked as "********". */
+  options: Record<string, unknown>;
+}
+
+export interface LibraryTrack {
+  key: string;
+  title: string;
+  artist: string;
+  album: string;
+  isrc: string;
+  duration_s: number;
+  status: TrackStatus;
+  filepath: string | null;
+  job_id: string | null;
+  error: string | null;
+  sources: string[];
+  playlists: string[];
+  updated_at: string;
+}
+
+export interface SyncReport {
+  collected: number;
+  unique: number;
+  already_owned: number;
+  already_downloaded: number;
+  queued: number;
+  failed_sources: string[];
+  job_ids: string[];
+}
+
+export interface LibraryStats {
+  counts: Partial<Record<TrackStatus, number>>;
+  total: number;
+  sources: number;
+  music_dir: string;
+}
+
+export interface SourceTestResult {
+  ok: boolean;
+  tracks: number;
+  with_isrc: number;
+  sample: string[];
 }

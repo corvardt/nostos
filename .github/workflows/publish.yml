@@ -1,0 +1,96 @@
+# Publish to PyPI on a GitHub release, via trusted publishing.
+#
+# There is no API token anywhere: PyPI verifies the workflow's OIDC identity
+# against a publisher configured on the project (owner corvardt, repo nostos,
+# workflow publish.yml, environment pypi). Set that up once at
+# https://pypi.org/manage/account/publishing/ before the first release.
+
+name: publish
+
+on:
+  release:
+    types: [published]
+  # Building on demand is useful for rehearsing a release without publishing.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Before the wheel, always. A package built without this installs
+      # cleanly, starts, and serves a 503 where the interface should be - and a
+      # version number can never be reused on PyPI, so the mistake costs a
+      # yank and a bump rather than a re-upload.
+      - name: "Assemble the package: interface and readme"
+        run: ./scripts/build-package.sh
+
+      - name: Build the wheel and sdist
+        run: pipx run build --wheel --sdist --outdir dist backend
+
+      - name: Refuse to publish an artifact with no interface in it
+        run: |
+          python - <<'PY'
+          import glob, sys, tarfile, zipfile
+
+          def check(path, names):
+              count = sum("/static/" in n for n in names)
+              if not any(n.endswith("static/index.html") for n in names):
+                  sys.exit(f"{path} contains no built interface")
+              print(f"{path}: {count} interface files")
+
+          for whl in glob.glob("dist/*.whl"):
+              check(whl, zipfile.ZipFile(whl).namelist())
+          for sdist in glob.glob("dist/*.tar.gz"):
+              with tarfile.open(sdist) as tar:
+                  check(sdist, tar.getnames())
+          PY
+
+      - name: Check the metadata renders on PyPI
+        run: pipx run twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  # Tests do not gate the build above, so a broken interface is caught by the
+  # guard even when the suite is red - but they do gate publishing.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e "backend[dev]"
+      - run: python -m pytest backend/tests -q
+
+  publish:
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    # A protected environment means a release cannot be published by a
+    # workflow run that was not meant to.
+    environment: pypi
+    permissions:
+      id-token: write # the OIDC token that replaces an API token
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

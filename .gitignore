@@ -7,11 +7,19 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
+build/
+*.egg-info/
+
 # Node
 node_modules/
 dist/
 *.tsbuildinfo
 npm-debug.log*
+
+# Generated into the Python package by scripts/build-package.sh at release
+# time: the built interface, and a copy of the readme for the PyPI page.
+backend/nostos/static/
+backend/README.md
 
 # Local data - never publish these. The database holds your download history,
 # and partial downloads may contain fragments of private media.

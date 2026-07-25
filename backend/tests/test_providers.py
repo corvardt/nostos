@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from app.providers import ProviderError, resolve_provider
-from app.providers.ytdlp_base import YtDlpProvider
+from nostos.providers import ProviderError, resolve_provider
+from nostos.providers.ytdlp_base import YtDlpProvider
 
 
 @pytest.mark.parametrize(
@@ -124,13 +124,13 @@ def test_final_path_missing_file_returns_none() -> None:
 def test_speed_string_is_stripped_of_ansi_colour() -> None:
     """yt-dlp colorizes `_speed_str` in the same dict it gives progress hooks,
     so an unscrubbed value reaches the browser as a literal "␛"."""
-    from app.jobs import _plain
+    from nostos.jobs import _plain
 
     assert _plain("\x1b[0;32m   2.15MiB/s\x1b[0m") == "2.15MiB/s"
 
 
 def test_plain_handles_empty_and_uncoloured_values() -> None:
-    from app.jobs import _plain
+    from nostos.jobs import _plain
 
     assert _plain("  1.2MiB/s  ") == "1.2MiB/s"
     assert _plain("") is None
